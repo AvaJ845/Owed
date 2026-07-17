@@ -1,32 +1,43 @@
-//
-//  OwedApp.swift
-//  Owed
-//
-//  Created by Dj on 7/16/26.
-//
-
 import SwiftUI
-import SwiftData
 
 @main
 struct OwedApp: App {
-    var sharedModelContainer: ModelContainer = {
-        let schema = Schema([
-            Item.self,
-        ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
-
-        do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
-        } catch {
-            fatalError("Could not create ModelContainer: \(error)")
-        }
-    }()
+    @State private var model = AppModel()
+    @State private var store = StoreManager()
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            RootView()
+                .environment(model)
+                .environment(store)
+                .tint(T.green)
+                .onChange(of: store.owned, initial: true) { _, owned in
+                    model.lifetime = owned
+                }
         }
-        .modelContainer(sharedModelContainer)
+    }
+}
+
+struct RootView: View {
+    init() {
+        // Opaque tab bar in the card color with a hairline top border,
+        // matching the Expo tab bar.
+        let appearance = UITabBarAppearance()
+        appearance.configureWithOpaqueBackground()
+        appearance.backgroundColor = UIColor(T.card)
+        appearance.shadowColor = UIColor(T.line)
+        UITabBar.appearance().standardAppearance = appearance
+        UITabBar.appearance().scrollEdgeAppearance = appearance
+    }
+
+    var body: some View {
+        TabView {
+            FindView()
+                .tabItem { Label("Find", systemImage: "building.columns") }
+            ClaimsView()
+                .tabItem { Label("My claims", systemImage: "tray.full") }
+            AlertsView()
+                .tabItem { Label("Alerts", systemImage: "bell") }
+        }
     }
 }

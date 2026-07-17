@@ -1,0 +1,38 @@
+{
+  "identifier" : "0WED0000",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "5.99",
+      "familyShareable" : false,
+      "internalID" : "0WED0001",
+      "localizations" : [
+        {
+          "description" : "Deadline alerts and claim tracking. One payment, forever.",
+          "displayName" : "Owed Lifetime",
+          "locale" : "en_US"
+        }
+      ],
+      "productID" : "com.example.owed.lifetime",
+      "referenceName" : "Owed Lifetime",
+      "type" : "NonConsumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
