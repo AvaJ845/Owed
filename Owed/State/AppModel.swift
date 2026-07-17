@@ -15,7 +15,18 @@ final class AppModel {
     }
 
     /// Mirrored from StoreManager on launch and after purchase/restore.
-    var lifetime = false
+    /// Turning true backfills deadline alerts for claims tracked before
+    /// the purchase — the buyer's existing claims are exactly the ones
+    /// they paid to be reminded about.
+    var lifetime = false {
+        didSet {
+            guard lifetime, !oldValue else { return }
+            let toSchedule = trackedSettlements
+            Task {
+                for s in toSchedule { await DeadlineAlerts.schedule(for: s) }
+            }
+        }
+    }
 
     /// The published feed. Mock today; production swaps this for the
     /// Owed API response (same shape — see PIPELINE.md §3).
@@ -34,13 +45,21 @@ final class AppModel {
         }
     }
 
-    var trackedSettlements: [Settlement] {
-        settlements.filter { tracked.contains($0.id) }.sorted { $0.daysLeft < $1.daysLeft }
+    func untrack(_ s: Settlement) {
+        tracked.remove(s.id)
+        DeadlineAlerts.cancel(for: s.id)
     }
 
-    /// Sum of best-case payouts across tracked claims — the hero number.
-    var potentialTotal: Int {
-        trackedSettlements.reduce(0) { $0 + $1.payoutHi }
+    var trackedSettlements: [Settlement] {
+        settlements.filter { tracked.contains($0.id) }.sorted { $0.deadline < $1.deadline }
+    }
+
+    /// Hero number as an honest range — anchoring on best-case totals
+    /// over-promises and earns 1-star reviews when checks arrive.
+    var potentialRange: String {
+        let lo = trackedSettlements.reduce(0) { $0 + $1.payoutLo }
+        let hi = trackedSettlements.reduce(0) { $0 + $1.payoutHi }
+        return lo == hi ? lo.usd : "\(lo.usd)–\(hi.usd)"
     }
 }
 
@@ -51,25 +70,51 @@ final class AppModel {
 /// replaces this for "new settlement" alerts; these local ones remain a
 /// good offline backstop.
 enum DeadlineAlerts {
-    static func schedule(for s: Settlement) async {
+    /// Requests permission only while undetermined. Callers reach this
+    /// right after a purchase or a tracked claim, so the system prompt
+    /// lands with context instead of appearing out of nowhere.
+    static func ensureAuthorized() async -> Bool {
         let center = UNUserNotificationCenter.current()
-        let granted = (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
-        guard granted else { return }
+        switch await center.notificationSettings().authorizationStatus {
+        case .notDetermined:
+            return (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+        case .authorized, .provisional, .ephemeral:
+            return true
+        default:
+            return false
+        }
+    }
+
+    static func schedule(for s: Settlement) async {
+        guard await ensureAuthorized() else { return }
+        let center = UNUserNotificationCenter.current()
+        let cal = Calendar.current
 
         for daysBefore in [7, 1] where s.daysLeft > daysBefore {
-            let fireIn = TimeInterval((s.daysLeft - daysBefore) * 86_400)
+            // Anchor to the deadline date at 9am local — a relative
+            // interval computed at track time drifts as the feed ages.
+            guard let fireDay = cal.date(byAdding: .day, value: -daysBefore, to: s.deadline) else { continue }
+            var comps = cal.dateComponents([.year, .month, .day], from: fireDay)
+            comps.hour = 9
+
             let content = UNMutableNotificationContent()
             content.title = daysBefore == 1 ? "Last day tomorrow" : "One week left"
             content.body = "\(s.name) closes in \(daysBefore) day\(daysBefore == 1 ? "" : "s"). "
                 + "Your claim isn't filed until the administrator confirms it."
             content.sound = .default
-            let trigger = UNTimeIntervalNotificationTrigger(timeInterval: fireIn, repeats: false)
+
             let request = UNNotificationRequest(
                 identifier: "owed.deadline.\(s.id).t\(daysBefore)",
                 content: content,
-                trigger: trigger
+                trigger: UNCalendarNotificationTrigger(dateMatching: comps, repeats: false)
             )
             try? await center.add(request)
         }
+    }
+
+    static func cancel(for settlementID: String) {
+        UNUserNotificationCenter.current().removePendingNotificationRequests(
+            withIdentifiers: [7, 1].map { "owed.deadline.\(settlementID).t\($0)" }
+        )
     }
 }

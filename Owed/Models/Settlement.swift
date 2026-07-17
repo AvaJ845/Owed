@@ -12,10 +12,23 @@ struct Settlement: Identifiable, Codable, Hashable {
     let payoutLo: Int
     let payoutHi: Int
     let payoutTerms: String
-    let daysLeft: Int
+    /// The claim-filing deadline. Stored as a date, never a day count —
+    /// a count is stale the day after the feed is fetched.
+    let deadline: Date
     let receiptRequired: Bool
     let adminURL: URL
     let eligibility: [String]
+
+    /// Whole days from today until the deadline, floored at 0.
+    var daysLeft: Int {
+        let cal = Calendar.current
+        let days = cal.dateComponents(
+            [.day],
+            from: cal.startOfDay(for: .now),
+            to: cal.startOfDay(for: deadline)
+        ).day ?? 0
+        return max(0, days)
+    }
 
     var payoutRange: String {
         payoutLo == payoutHi
@@ -26,26 +39,36 @@ struct Settlement: Identifiable, Codable, Hashable {
     var closingSoon: Bool { daysLeft <= 21 }
 }
 
+private let usdFormatter: NumberFormatter = {
+    let f = NumberFormatter()
+    f.numberStyle = .decimal
+    f.locale = Locale(identifier: "en_US")
+    return f
+}()
+
 extension Int {
     /// "$5,000" — whole-dollar amounts, US grouping, matching money() in lib/data.js.
     var usd: String {
-        let f = NumberFormatter()
-        f.numberStyle = .decimal
-        f.locale = Locale(identifier: "en_US")
-        return "$" + (f.string(from: NSNumber(value: self)) ?? String(self))
+        "$" + (usdFormatter.string(from: NSNumber(value: self)) ?? String(self))
     }
 }
 
 // MARK: - Mock feed (production shape; see PIPELINE.md)
 
 extension Settlement {
+    /// Mock deadlines are relative to install day so the demo always shows
+    /// a live-looking feed; the production API sends absolute dates.
+    private static func inDays(_ n: Int) -> Date {
+        Calendar.current.date(byAdding: .day, value: n, to: Calendar.current.startOfDay(for: .now))!
+    }
+
     static let mockFeed: [Settlement] = [
         Settlement(
             id: "s1", caseNo: "No. 3:24-cv-01881",
             name: "StreamBox Privacy Settlement",
             category: "Data privacy — viewing history shared with advertisers",
             payoutLo: 38, payoutHi: 120, payoutTerms: "per class member",
-            daysLeft: 11, receiptRequired: false,
+            deadline: inDays(11), receiptRequired: false,
             adminURL: URL(string: "https://example-administrator.com/streambox")!,
             eligibility: [
                 "I had a StreamBox account between Jan 2019 and Mar 2024",
@@ -57,7 +80,7 @@ extension Settlement {
             name: "MegaMart Overcharge Settlement",
             category: "False advertising — unit pricing on weighed goods",
             payoutLo: 25, payoutHi: 500, payoutTerms: "depends on purchase history",
-            daysLeft: 36, receiptRequired: false,
+            deadline: inDays(36), receiptRequired: false,
             adminURL: URL(string: "https://example-administrator.com/megamart")!,
             eligibility: [
                 "I bought weighed grocery items at MegaMart 2020–2023",
@@ -69,7 +92,7 @@ extension Settlement {
             name: "Handset Battery Throttling",
             category: "Consumer electronics — undisclosed performance limits",
             payoutLo: 65, payoutHi: 65, payoutTerms: "per eligible device",
-            daysLeft: 58, receiptRequired: true,
+            deadline: inDays(58), receiptRequired: true,
             adminURL: URL(string: "https://example-administrator.com/handset")!,
             eligibility: [
                 "I owned an affected handset model (serial check at filing)",
@@ -81,7 +104,7 @@ extension Settlement {
             name: "FastFashion Text Spam (TCPA)",
             category: "Telemarketing — texts after opt-out",
             payoutLo: 150, payoutHi: 900, payoutTerms: "per claimant",
-            daysLeft: 23, receiptRequired: false,
+            deadline: inDays(23), receiptRequired: false,
             adminURL: URL(string: "https://example-administrator.com/fastfashion")!,
             eligibility: [
                 "I received marketing texts after replying STOP",
@@ -93,7 +116,7 @@ extension Settlement {
             name: "CreditWatch Data Breach",
             category: "Data breach — SSNs and DOBs exposed",
             payoutLo: 50, payoutHi: 5000, payoutTerms: "up to, with documented losses",
-            daysLeft: 120, receiptRequired: true,
+            deadline: inDays(120), receiptRequired: true,
             adminURL: URL(string: "https://example-administrator.com/creditwatch")!,
             eligibility: [
                 "I received a breach notice or can verify exposure",

@@ -15,7 +15,7 @@
           "locale" : "en_US"
         }
       ],
-      "productID" : "com.example.owed.lifetime",
+      "productID" : "AvaResearchLLC.Owed.lifetime",
       "referenceName" : "Owed Lifetime",
       "type" : "NonConsumable"
     }

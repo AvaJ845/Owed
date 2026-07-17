@@ -78,6 +78,17 @@ struct SettlementDetailView: View {
                     .foregroundStyle(T.mut)
                     .frame(maxWidth: .infinity)
                     .padding(12)
+
+                if isTracked {
+                    Button("Stop tracking this claim") {
+                        model.untrack(settlement)
+                        dismiss()
+                    }
+                    .font(OwedFont.body(13.5, weight: .semibold))
+                    .foregroundStyle(T.stamp)
+                    .frame(maxWidth: .infinity)
+                    .padding(.bottom, 4)
+                }
             }
             .padding(20)
             .padding(.bottom, 20)

@@ -100,9 +100,11 @@ struct FindView: View {
 
             if !model.trackedSettlements.isEmpty {
                 HStack(alignment: .firstTextBaseline, spacing: 10) {
-                    Text(model.potentialTotal.usd)
+                    Text(model.potentialRange)
                         .font(OwedFont.displayBold(25))
                         .foregroundStyle(T.green)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
                         .contentTransition(.numericText())
                     Text("POTENTIAL ACROSS \(model.trackedSettlements.count) TRACKED")
                         .font(OwedFont.body(10, weight: .semibold))

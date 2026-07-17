@@ -11,7 +11,7 @@ import StoreKit
 /// ~80 lines. Revisit only if the backend needs server-side entitlements.
 @Observable
 final class StoreManager {
-    static let lifetimeID = "com.example.owed.lifetime"
+    static let lifetimeID = "AvaResearchLLC.Owed.lifetime"
 
     private(set) var product: Product?
     private(set) var owned = false
@@ -78,11 +78,15 @@ final class StoreManager {
     }
 
     private func refreshEntitlement() async {
+        // Recompute from scratch so a refund/revocation discovered on
+        // restore clears the flag instead of leaving it stuck on.
+        var found = false
         for await entitlement in Transaction.currentEntitlements {
             if case .verified(let t) = entitlement,
                t.productID == Self.lifetimeID, t.revocationDate == nil {
-                owned = true
+                found = true
             }
         }
+        owned = found
     }
 }

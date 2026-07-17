@@ -1,10 +1,12 @@
 import SwiftUI
+import UserNotifications
 
 /// Alerts tab — doubles as the upsell surface when lifetime isn't owned.
 struct AlertsView: View {
     @Environment(AppModel.self) private var model
     @Environment(StoreManager.self) private var store
     @State private var showPaywall = false
+    @State private var notificationsDenied = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -22,6 +24,10 @@ struct AlertsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(T.paper)
         .sheet(isPresented: $showPaywall) { PaywallView() }
+        .task(id: model.lifetime) {
+            let settings = await UNUserNotificationCenter.current().notificationSettings()
+            notificationsDenied = settings.authorizationStatus == .denied
+        }
     }
 
     private var covered: some View {
@@ -33,6 +39,26 @@ struct AlertsView: View {
                 .font(OwedFont.body(13.5))
                 .foregroundStyle(T.mut)
                 .multilineTextAlignment(.center)
+
+            if notificationsDenied {
+                VStack(spacing: 10) {
+                    Text("Notifications are turned off, so deadline reminders can't reach you.")
+                        .font(OwedFont.body(12.5))
+                        .foregroundStyle(T.stamp)
+                        .multilineTextAlignment(.center)
+                    Button("Turn on in Settings") {
+                        if let url = URL(string: UIApplication.openNotificationSettingsURLString) {
+                            UIApplication.shared.open(url)
+                        }
+                    }
+                    .font(OwedFont.body(13, weight: .bold))
+                    .foregroundStyle(T.green)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity)
+                .background(T.stampSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                .padding(.top, 16)
+            }
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 60)
