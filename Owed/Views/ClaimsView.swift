@@ -7,7 +7,8 @@ struct ClaimsView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var selected: Settlement?
-    @State private var pendingUntrack: Settlement?
+    @State private var untrackCandidate: Settlement?
+    @State private var showUntrackConfirm = false
 
     var body: some View {
         Group {
@@ -27,23 +28,31 @@ struct ClaimsView: View {
         }
         .confirmationDialog(
             "Stop tracking this claim?",
-            isPresented: Binding(
-                get: { pendingUntrack != nil },
-                set: { if !$0 { pendingUntrack = nil } }
-            ),
+            isPresented: $showUntrackConfirm,
             titleVisibility: .visible
         ) {
-            if let s = pendingUntrack {
-                Button("Stop tracking", role: .destructive) {
+            Button("Stop tracking", role: .destructive) {
+                if let s = untrackCandidate {
                     withAnimation(OwedMotion.listChange(reduceMotion: reduceMotion)) {
                         model.untrack(s)
                     }
-                    pendingUntrack = nil
                 }
+                untrackCandidate = nil
             }
-            Button("Cancel", role: .cancel) { pendingUntrack = nil }
+            Button("Cancel", role: .cancel) {
+                untrackCandidate = nil
+            }
         } message: {
             Text("Your logged payout stays on this device. You can start the claim again from Find.")
+        }
+        .onChange(of: privacy.unlocked) { _, unlocked in
+            // Privacy invariant: locking must dismiss an open claim sheet —
+            // otherwise backgrounding leaves payout/eligibility on screen.
+            if !unlocked {
+                selected = nil
+                showUntrackConfirm = false
+                untrackCandidate = nil
+            }
         }
     }
 
@@ -100,7 +109,8 @@ struct ClaimsView: View {
                         .listRowSeparator(.hidden)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {
                             Button(role: .destructive) {
-                                pendingUntrack = s
+                                untrackCandidate = s
+                                showUntrackConfirm = true
                             } label: {
                                 Label("Stop", systemImage: "xmark.circle")
                             }
@@ -141,7 +151,7 @@ struct ClaimsView: View {
             Button {
                 Task { await privacy.unlock() }
             } label: {
-                Text("Unlock with \(privacy.biometryLabel)")
+                Text(privacy.isAuthenticating ? "Unlocking…" : "Unlock with \(privacy.biometryLabel)")
                     .font(OwedFont.body(15, weight: .bold))
                     .foregroundStyle(.white)
                     .frame(maxWidth: .infinity)
@@ -149,17 +159,17 @@ struct ClaimsView: View {
                     .background(T.green, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
             }
             .buttonStyle(.plain)
+            .disabled(privacy.isAuthenticating)
             .padding(.horizontal, 40)
             .padding(.top, 8)
             .accessibilityHint("Authenticates with \(privacy.biometryLabel) to show your claims")
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .task {
+        .task(id: privacy.unlocked) {
             // Auto-prompt once when the tab appears locked.
-            if !privacy.unlocked {
-                _ = await privacy.unlock()
-            }
+            guard !privacy.unlocked, !privacy.isAuthenticating else { return }
+            _ = await privacy.unlock()
         }
     }
 

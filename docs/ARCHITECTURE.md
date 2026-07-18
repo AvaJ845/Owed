@@ -329,8 +329,9 @@ Threat model for the feed: **integrity**, not confidentiality. The JSON is publi
 | CloudKit sync of claims / quiz | **No.** Privacy contract is on-device only; multi-person IOU sync is a different product. |
 | SwiftData for the ledger | Deferred — UserDefaults + JSON snapshots are enough at current volume; migrate when App Group / widget forces a shared store. |
 | App Intents / Spotlight deep links | **Yes** — `OwedAppIntents`, `AppNavigation`, `CSSearchableItemActionType`. |
-| Face ID on My claims | **Yes** — session unlock via `ClaimsPrivacyGate`; locks on background. |
+| Face ID on My claims | **Yes** — session unlock via `ClaimsPrivacyGate`; locks on background; open claim sheets dismiss on lock. |
 | SwipeActions / pull-to-refresh / Reduce Motion springs | **Yes** — HIG friction reduction without changing the product. |
+| Intent / BG shared state | **`AppRuntime`** owns the single `AppModel` / nav / store; Intents wire the bridge in `perform` and `OwedApp.init` so cold-start Siri cannot race the first SwiftUI `.task`. |
 
 ---
 

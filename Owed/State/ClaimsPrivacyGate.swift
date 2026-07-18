@@ -12,6 +12,8 @@ final class ClaimsPrivacyGate {
     private(set) var unlocked = false
     private(set) var biometryAvailable = false
     private(set) var biometryLabel = "Face ID"
+    /// Prevents overlapping `evaluatePolicy` from lock-screen `.task` + button.
+    private(set) var isAuthenticating = false
 
     init() {
         refreshAvailability()
@@ -45,6 +47,10 @@ final class ClaimsPrivacyGate {
             unlocked = true
             return true
         }
+        guard !isAuthenticating else { return unlocked }
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+
         let context = LAContext()
         context.localizedCancelTitle = "Cancel"
         do {

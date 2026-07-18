@@ -15,13 +15,16 @@ enum FeedRefreshBridge {
 
 @main
 struct OwedApp: App {
-    @State private var model = AppModel()
-    @State private var store = StoreManager()
-    @State private var navigation = AppNavigation()
-    @State private var claimsPrivacy = ClaimsPrivacyGate()
+    /// Same instances Intents bind to in `init` — `@State` keeps Observation alive.
+    @State private var model = AppRuntime.model
+    @State private var store = AppRuntime.store
+    @State private var navigation = AppRuntime.navigation
+    @State private var claimsPrivacy = AppRuntime.claimsPrivacy
     @Environment(\.scenePhase) private var scenePhase
 
     init() {
+        // Wire before first frame so cold-start Siri / Shortcuts don't race `.task`.
+        AppRuntime.wireIntentBridge()
         // Must register before the app finishes launching.
         FeedBackgroundRefresh.register {
             await FeedRefreshBridge.perform()
@@ -40,11 +43,10 @@ struct OwedApp: App {
                     model.lifetime = owned
                 }
                 .task {
-                    IntentBridge.model = model
-                    IntentBridge.navigation = navigation
+                    AppRuntime.wireIntentBridge()
                     SpotlightIndexer.index(model.settlements)
-                    FeedRefreshBridge.refresh = { [model] in
-                        await model.refreshFeed()
+                    FeedRefreshBridge.refresh = {
+                        await AppRuntime.model.refreshFeed()
                     }
                     FeedBackgroundRefresh.schedule()
                 }

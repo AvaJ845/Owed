@@ -1,6 +1,5 @@
 import Foundation
 import Observation
-import SwiftUI
 
 /// Cross-surface destinations for Spotlight, App Intents, and tab chrome.
 /// Keeps deep links out of individual views while remaining process-local
@@ -29,12 +28,5 @@ final class AppNavigation {
 
     func showClaims() {
         selectedTab = .claims
-    }
-
-    func consumePendingSettlement(from settlements: [Settlement]) -> Settlement? {
-        guard let id = pendingSettlementID else { return nil }
-        pendingSettlementID = nil
-        return settlements.first { $0.id == id }
-            ?? settlements.first // fallback unused; caller may also check snapshots
     }
 }

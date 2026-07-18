@@ -50,6 +50,7 @@ struct ShowClosingSoonIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        AppRuntime.wireIntentBridge()
         let nav = try IntentBridge.requireNavigation()
         nav.showClosingSoon()
         let model = try IntentBridge.requireModel()
@@ -71,6 +72,7 @@ struct ShowMyClaimsIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        AppRuntime.wireIntentBridge()
         try IntentBridge.requireNavigation().showClaims()
         let model = try IntentBridge.requireModel()
         let n = model.trackedSettlements.count
@@ -89,10 +91,13 @@ struct RefreshSettlementFeedIntent: AppIntent {
     static var description = IntentDescription(
         "Downloads the latest signed settlement feed and reconciles your tracked claims."
     )
-    static var openAppWhenRun = false
+    /// Must launch so `AppRuntime` / IntentBridge exist; background-only
+    /// refresh with a nil bridge fails cold Shortcuts runs.
+    static var openAppWhenRun = true
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        AppRuntime.wireIntentBridge()
         let model = try IntentBridge.requireModel()
         await model.refreshFeed()
         let n = model.settlements.filter { !$0.closed }.count
@@ -112,6 +117,7 @@ struct OpenSettlementIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        AppRuntime.wireIntentBridge()
         let nav = try IntentBridge.requireNavigation()
         nav.openSettlement(id: settlement.id)
         return .result(dialog: IntentDialog("Opening \(settlement.name)."))
@@ -133,11 +139,16 @@ struct SettlementEntity: AppEntity {
 }
 
 struct SettlementEntityQuery: EntityQuery {
+    @MainActor
+    private func model() -> AppModel {
+        AppRuntime.wireIntentBridge()
+        return IntentBridge.model ?? AppRuntime.model
+    }
+
     func entities(for identifiers: [SettlementEntity.ID]) async throws -> [SettlementEntity] {
-        let model = await MainActor.run { IntentBridge.model }
-        guard let model else { return [] }
-        return await MainActor.run {
-            identifiers.compactMap { id in
+        await MainActor.run {
+            let model = model()
+            return identifiers.compactMap { id in
                 guard let s = model.settlements.first(where: { $0.id == id })
                         ?? model.trackedSettlements.first(where: { $0.id == id })
                 else { return nil }
@@ -147,10 +158,8 @@ struct SettlementEntityQuery: EntityQuery {
     }
 
     func suggestedEntities() async throws -> [SettlementEntity] {
-        let model = await MainActor.run { IntentBridge.model }
-        guard let model else { return [] }
-        return await MainActor.run {
-            model.settlements
+        await MainActor.run {
+            model().settlements
                 .filter { !$0.closed }
                 .sorted { $0.deadline < $1.deadline }
                 .prefix(12)
@@ -162,10 +171,8 @@ struct SettlementEntityQuery: EntityQuery {
 extension SettlementEntityQuery: EntityStringQuery {
     func entities(matching string: String) async throws -> [SettlementEntity] {
         let needle = string.lowercased()
-        let model = await MainActor.run { IntentBridge.model }
-        guard let model else { return [] }
         return await MainActor.run {
-            model.settlements
+            model().settlements
                 .filter {
                     !$0.closed && (
                         $0.name.lowercased().contains(needle)
