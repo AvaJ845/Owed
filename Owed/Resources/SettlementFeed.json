@@ -1,6 +1,7 @@
 {
   "schemaVersion": 1,
   "generatedAt": "2026-07-18T00:00:00Z",
+  "minAppVersion": "1.0",
   "settlements": [
     {
       "id": "s1",

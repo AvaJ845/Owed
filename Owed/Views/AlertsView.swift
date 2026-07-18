@@ -19,6 +19,16 @@ struct AlertsView: View {
             if model.lifetime { covered } else { upsell }
 
             Spacer()
+
+            // Freshness stamp — cheap trust signal that the list is a
+            // maintained, published feed, not static app content.
+            if let generatedAt = model.feedGeneratedAt {
+                Text("SETTLEMENT LIST UPDATED \(generatedAt.formatted(date: .abbreviated, time: .omitted).uppercased())")
+                    .font(OwedFont.body(10, weight: .semibold))
+                    .kerning(0.8)
+                    .foregroundStyle(T.mut)
+                    .frame(maxWidth: .infinity)
+            }
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)

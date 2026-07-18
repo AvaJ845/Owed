@@ -13,6 +13,11 @@ struct ClaimsView: View {
                     .padding(.leading, 4)
                     .padding(.bottom, 14)
 
+                ForEach(model.deadlineNotices) { notice in
+                    deadlineNoticeCard(notice)
+                        .padding(.bottom, 10)
+                }
+
                 if model.totalRecovered > 0 {
                     recoveredCard
                         .padding(.bottom, 14)
@@ -42,6 +47,43 @@ struct ClaimsView: View {
             SettlementDetailView(settlement: s)
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    /// A court moved a deadline on a tracked claim. Shown until the user
+    /// dismisses it — reminders were already rescheduled, but the user
+    /// may have planned around the old date (or calendared it).
+    private func deadlineNoticeCard(_ notice: AppModel.DeadlineNotice) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundStyle(T.stamp)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("Deadline changed")
+                    .font(OwedFont.body(12.5, weight: .bold))
+                    .foregroundStyle(T.ink)
+                Text("\(notice.name) now closes \(notice.newDeadline.formatted(date: .abbreviated, time: .omitted)) (was \(notice.oldDeadline.formatted(date: .abbreviated, time: .omitted))). Reminders are updated; re-add the calendar event if you saved one.")
+                    .font(OwedFont.body(12))
+                    .foregroundStyle(T.mut)
+            }
+
+            Spacer(minLength: 4)
+
+            Button {
+                model.dismissDeadlineNotice(notice)
+            } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(T.mut)
+                    .padding(4)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Dismiss deadline change notice")
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(T.stampSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 
     /// Lifetime recovered total — the retention number and the screenshot

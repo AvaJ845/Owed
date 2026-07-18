@@ -3,7 +3,12 @@ import Foundation
 /// One published, human-reviewed settlement, decoded from the settlement
 /// feed (SettlementFeed). Field shape mirrors the production API contract
 /// in PIPELINE.md §3.
-struct Settlement: Identifiable, Decodable, Hashable {
+///
+/// Codable both ways: decoded from the feed, and encoded into the local
+/// snapshot of tracked claims — a settlement the user tracks must survive
+/// dropping out of the published feed (their claim status and logged
+/// payout live under its id).
+struct Settlement: Identifiable, Codable, Hashable {
     let id: String
     let caseNo: String
     let name: String
@@ -107,6 +112,26 @@ extension Settlement {
         matchKeys = try c.decode([String].self, forKey: .matchKeys)
             .compactMap(MatchKey.init)
         verifiedAt = try c.decodeFeedDay(forKey: .verifiedAt)
+    }
+
+    /// Mirrors the feed contract exactly (day-precision date strings,
+    /// match keys as raw strings) so an encoded snapshot decodes through
+    /// the same strict `init(from:)` it was validated by.
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(caseNo, forKey: .caseNo)
+        try c.encode(name, forKey: .name)
+        try c.encode(category, forKey: .category)
+        try c.encode(payoutLo, forKey: .payoutLo)
+        try c.encode(payoutHi, forKey: .payoutHi)
+        try c.encode(payoutTerms, forKey: .payoutTerms)
+        try c.encode(FeedDay.string(from: deadline), forKey: .deadline)
+        try c.encode(receiptRequired, forKey: .receiptRequired)
+        try c.encode(adminURL, forKey: .adminURL)
+        try c.encode(eligibility, forKey: .eligibility)
+        try c.encode(matchKeys.map(\.rawValue), forKey: .matchKeys)
+        try c.encode(FeedDay.string(from: verifiedAt), forKey: .verifiedAt)
     }
 }
 

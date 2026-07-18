@@ -23,8 +23,10 @@ notifications, haptics, Dynamic Type-friendly layout.
     Owed/
       OwedApp.swift          app entry + tab root
       Theme.swift            palette + font fallback + shared card chrome
-      Models/Settlement.swift  model + mock feed (production API shape, PIPELINE.md §3)
-      State/AppModel.swift   tracked claims (persisted), local T-7/T-1 deadline alerts
+      Models/Settlement.swift  model, strict feed decode (production shape, PIPELINE.md §3)
+      Models/SettlementFeed.swift feed envelope: schema gate, lossy record decode
+      State/FeedStore.swift  remote fetch (ETag) + disk cache + bundled snapshot floor
+      State/AppModel.swift   tracked claims (persisted), feed reconciliation, T-7/T-1 alerts
       State/StoreManager.swift StoreKit 2: purchase, restore, Transaction.updates
       Views/                 Find, Claims, Alerts, Detail (attestation gate), Paywall, DocketCard
 
@@ -33,8 +35,14 @@ Deliberate calls:
 - **StoreKit 2, not RevenueCat.** One non-consumable doesn't justify an SDK.
   `Transaction.currentEntitlements` is the source of truth; the UI mirrors it.
   Restore Purchases is on the paywall (review requirement for non-consumables).
-- **Mock feed = production shape.** Swapping `Settlement.mockFeed` for
-  `GET /v1/settlements?status=open` is one decoder, zero view changes.
+- **Live feed, conservative client.** The app fetches a published JSON
+  snapshot (ETag-cached, disk cache as last-good, bundled copy as the
+  offline floor) — never a per-user API. On each refresh it reconciles
+  tracked claims: deadline moves reschedule the local alerts and surface
+  a visible notice, and a settlement dropping out of the feed never
+  deletes the user's tracked claim or logged payout (local snapshots).
+  The fetch carries no identifiers — "your answers never leave this
+  phone" is a product invariant, not copy.
 - **Local notifications now, push later.** T-7/T-1 deadline reminders are
   scheduled on-device when a lifetime user tracks a claim, so the paid perk
   is real before the server pipeline (PIPELINE.md §5) ships. Server push

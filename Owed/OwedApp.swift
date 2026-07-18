@@ -4,6 +4,7 @@ import SwiftUI
 struct OwedApp: App {
     @State private var model = AppModel()
     @State private var store = StoreManager()
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
@@ -16,6 +17,14 @@ struct OwedApp: App {
                 }
                 .task {
                     SpotlightIndexer.index(model.settlements)
+                }
+                // Refresh on launch and on every return to foreground —
+                // deadlines move on the order of days, so foreground
+                // refresh keeps tracked claims honest without background
+                // task infrastructure.
+                .task(id: scenePhase) {
+                    guard scenePhase == .active else { return }
+                    await model.refreshFeed()
                 }
         }
     }

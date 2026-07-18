@@ -20,10 +20,15 @@ struct SettlementFeed: Decodable {
 
     let schemaVersion: Int
     let generatedAt: Date
+    /// Lowest app marketing version the publisher considers fully able to
+    /// use this feed. Soft signal only — the app logs and can nudge, but
+    /// never blocks on it. In the envelope from day one because it can't
+    /// be retrofitted onto clients already in the field.
+    let minAppVersion: String?
     let settlements: [Settlement]
 
     private enum CodingKeys: String, CodingKey {
-        case schemaVersion, generatedAt, settlements
+        case schemaVersion, generatedAt, minAppVersion, settlements
     }
 
     init(from decoder: Decoder) throws {
@@ -38,6 +43,7 @@ struct SettlementFeed: Decodable {
         }
 
         generatedAt = try container.decode(Date.self, forKey: .generatedAt)
+        minAppVersion = try container.decodeIfPresent(String.self, forKey: .minAppVersion)
 
         // Lossy decode: skip records that fail, keep the rest. Duplicate
         // ids keep the first occurrence — ids key all local persistence
@@ -80,6 +86,17 @@ private struct SkippedRecord: Decodable {}
 // MARK: - Loading
 
 extension SettlementFeed {
+    /// The one decode path for every feed source — bundled snapshot,
+    /// disk cache, and remote fetch all go through here, so a record the
+    /// remote path would reject can't sneak in via the cache.
+    static func decode(_ data: Data) throws -> SettlementFeed {
+        let decoder = JSONDecoder()
+        // Applies to `generatedAt` only; settlement day-precision
+        // fields decode through FeedDay.
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(SettlementFeed.self, from: data)
+    }
+
     /// The snapshot shipped in the app bundle. A missing or undecodable
     /// bundled feed is a build defect: assert in Debug, return nil (empty
     /// feed) in Release rather than crash.
@@ -90,11 +107,7 @@ extension SettlementFeed {
             return nil
         }
         do {
-            let decoder = JSONDecoder()
-            // Applies to `generatedAt` only; settlement day-precision
-            // fields decode through FeedDay.
-            decoder.dateDecodingStrategy = .iso8601
-            return try decoder.decode(SettlementFeed.self, from: Data(contentsOf: url))
+            return try decode(Data(contentsOf: url))
         } catch {
             assertionFailure("Bundled feed failed to decode: \(error)")
             log.fault("Bundled feed failed to decode: \(String(describing: error))")
@@ -123,6 +136,12 @@ enum FeedDay {
 
     static func date(from string: String) -> Date? {
         formatter.date(from: string)
+    }
+
+    /// Inverse of `date(from:)`, used when encoding local snapshots so
+    /// they round-trip through the same strict decode as the feed.
+    static func string(from date: Date) -> String {
+        formatter.string(from: date)
     }
 }
 
