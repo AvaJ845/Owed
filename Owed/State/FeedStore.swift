@@ -16,6 +16,10 @@ import os
 /// identifiers, no cookies, no query parameters — "your answers never
 /// leave this phone" is printed in the UI and this request must keep it
 /// true.
+///
+/// Integrity: remote bytes must verify under the embedded Ed25519 public
+/// key (`FeedSigning`) before they replace last-good. A CDN compromise
+/// cannot inject a fake administrator URL.
 enum FeedStore {
     /// The published feed. Currently the repo's own snapshot served raw
     /// from GitHub; swap for the CDN URL when the publish pipeline
@@ -74,8 +78,17 @@ enum FeedStore {
             return nil
         }
 
-        // Decode before persisting: a feed that fails the envelope's
-        // strict decode never replaces the last-good cache.
+        // Signature before decode: a CDN that serves a well-formed but
+        // malicious feed must not enter the decode path at all.
+        guard let signature = await fetchSignature() else {
+            log.error("Remote feed signature missing; keeping last-good")
+            return nil
+        }
+        guard FeedSigning.verify(payload: data, signature: signature) else {
+            log.error("Remote feed signature invalid; keeping last-good")
+            return nil
+        }
+
         let feed: SettlementFeed
         do {
             feed = try SettlementFeed.decode(data)
@@ -94,6 +107,28 @@ enum FeedStore {
         persist(data: data, etag: http.value(forHTTPHeaderField: "ETag"))
         logMinAppVersionIfBehind(feed)
         return feed
+    }
+
+    // MARK: - Signature
+
+    private static var signatureURL: URL {
+        remoteURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("SettlementFeed.json.sig")
+    }
+
+    private static func fetchSignature() async -> Data? {
+        var request = URLRequest(url: signatureURL)
+        request.cachePolicy = .reloadIgnoringLocalCacheData
+        do {
+            let (data, response) = try await session.data(for: request)
+            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+                return nil
+            }
+            return data
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - Disk cache

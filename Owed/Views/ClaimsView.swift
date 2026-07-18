@@ -50,36 +50,57 @@ struct ClaimsView: View {
     }
 
     /// A court moved a deadline on a tracked claim. Shown until the user
-    /// dismisses it — reminders were already rescheduled, but the user
-    /// may have planned around the old date (or calendared it).
+    /// dismisses it — reminders were already rescheduled. Calendar may
+    /// have updated in place; if not (write-only access), offer re-add.
     private func deadlineNoticeCard(_ notice: AppModel.DeadlineNotice) -> some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "calendar.badge.exclamationmark")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(T.stamp)
-                .padding(.top, 1)
+        let needsCalendarReadd = !model.calendared.contains(notice.settlementID)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("Deadline changed")
-                    .font(OwedFont.body(12.5, weight: .bold))
-                    .foregroundStyle(T.ink)
-                Text("\(notice.name) now closes \(notice.newDeadline.formatted(date: .abbreviated, time: .omitted)) (was \(notice.oldDeadline.formatted(date: .abbreviated, time: .omitted))). Reminders are updated; re-add the calendar event if you saved one.")
-                    .font(OwedFont.body(12))
-                    .foregroundStyle(T.mut)
+        return VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "calendar.badge.exclamationmark")
+                    .font(OwedFont.icon(16))
+                    .foregroundStyle(T.stamp)
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Deadline changed")
+                        .font(OwedFont.body(12.5, weight: .bold))
+                        .foregroundStyle(T.ink)
+                    Text(needsCalendarReadd
+                         ? "\(notice.name) now closes \(notice.newDeadline.formatted(date: .abbreviated, time: .omitted)) (was \(notice.oldDeadline.formatted(date: .abbreviated, time: .omitted))). Reminders are updated — tap below to put the new date on your calendar."
+                         : "\(notice.name) now closes \(notice.newDeadline.formatted(date: .abbreviated, time: .omitted)) (was \(notice.oldDeadline.formatted(date: .abbreviated, time: .omitted))). Reminders and your calendar event are updated.")
+                        .font(OwedFont.body(12))
+                        .foregroundStyle(T.mut)
+                }
+
+                Spacer(minLength: 4)
+
+                Button {
+                    model.dismissDeadlineNotice(notice)
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(OwedFont.icon(11, weight: .bold))
+                        .foregroundStyle(T.mut)
+                        .padding(4)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Dismiss deadline change notice")
             }
 
-            Spacer(minLength: 4)
-
-            Button {
-                model.dismissDeadlineNotice(notice)
-            } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(T.mut)
-                    .padding(4)
+            if needsCalendarReadd {
+                Button {
+                    Task {
+                        if await model.readdCalendar(for: notice) {
+                            model.dismissDeadlineNotice(notice)
+                        }
+                    }
+                } label: {
+                    Text("Add updated date to Calendar")
+                        .font(OwedFont.body(12.5, weight: .bold))
+                        .foregroundStyle(T.green)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Dismiss deadline change notice")
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

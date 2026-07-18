@@ -123,14 +123,6 @@
 		};
 /* End PBXNativeTarget section */
 
-/* Begin PBXTargetDependency section */
-		A200000000000000000000A8 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = A100000000000000000000E1 /* Owed */;
-			targetProxy = A200000000000000000000A9 /* PBXContainerItemProxy */;
-		};
-/* End PBXTargetDependency section */
-
 /* Begin PBXProject section */
 		A100000000000000000000F1 /* Project object */ = {
 			isa = PBXProject;
@@ -194,6 +186,14 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		A200000000000000000000A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A100000000000000000000E1 /* Owed */;
+			targetProxy = A200000000000000000000A9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		A10000000000000000000101 /* Debug */ = {

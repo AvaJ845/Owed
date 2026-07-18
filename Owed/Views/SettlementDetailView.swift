@@ -141,8 +141,8 @@ struct SettlementDetailView: View {
                 disabled: calendarAdded
             ) {
                 Task {
-                    if await CalendarHelper.addDeadline(for: settlement) {
-                        model.markCalendared(settlement)
+                    if let eventID = await CalendarHelper.addDeadline(for: settlement) {
+                        model.markCalendared(settlement, eventIdentifier: eventID)
                         calendarFailed = false
                     } else {
                         calendarFailed = true
@@ -195,7 +195,7 @@ struct SettlementDetailView: View {
         }
         return HStack(alignment: .top, spacing: 10) {
             Image(systemName: "clock.badge.checkmark")
-                .font(.system(size: 16, weight: .semibold))
+                .font(OwedFont.icon(16))
                 .foregroundStyle(T.green)
                 .padding(.top, 1)
             VStack(alignment: .leading, spacing: 3) {
@@ -220,7 +220,7 @@ struct SettlementDetailView: View {
         Button(action: action) {
             HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .semibold))
+                    .font(OwedFont.icon(14))
                 Text(title)
                     .font(OwedFont.body(14, weight: .semibold))
             }

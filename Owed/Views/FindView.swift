@@ -112,7 +112,7 @@ struct FindView: View {
 
             Button { showQuiz = true } label: {
                 Image(systemName: "sparkles")
-                    .font(.system(size: 15, weight: .semibold))
+                    .font(OwedFont.icon(15))
                     .foregroundStyle(T.gold)
                     .padding(6)
             }

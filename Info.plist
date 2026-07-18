@@ -24,6 +24,14 @@
 	<false/>
 	<key>NSCalendarsWriteOnlyAccessUsageDescription</key>
 	<string>Owed adds claim deadlines to your calendar so you never miss a filing window. It never reads your existing events.</string>
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>AvaResearchLLC.Owed.refreshFeed</string>
+	</array>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>fetch</string>
+	</array>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

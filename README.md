@@ -37,12 +37,17 @@ Deliberate calls:
   Restore Purchases is on the paywall (review requirement for non-consumables).
 - **Live feed, conservative client.** The app fetches a published JSON
   snapshot (ETag-cached, disk cache as last-good, bundled copy as the
-  offline floor) — never a per-user API. On each refresh it reconciles
-  tracked claims: deadline moves reschedule the local alerts and surface
-  a visible notice, and a settlement dropping out of the feed never
+  offline floor) — never a per-user API. Remote bytes must verify under
+  an embedded Ed25519 public key (`SettlementFeed.json.sig`); a CDN
+  compromise can't inject a fake administrator URL. On each refresh it
+  reconciles tracked claims: deadline moves reschedule local alerts,
+  best-effort update the calendar event (or offer one-tap re-add under
+  write-only access), and a settlement dropping out of the feed never
   deletes the user's tracked claim or logged payout (local snapshots).
-  The fetch carries no identifiers — "your answers never leave this
-  phone" is a product invariant, not copy.
+  Foreground refresh is primary; `BGAppRefreshTask` is the opportunistic
+  backstop. The fetch carries no identifiers — "your answers never leave
+  this phone" is a product invariant, not copy. After editing the feed,
+  run `./Scripts/sign-feed.sh` (private key in `Scripts/keys/`, gitignored).
 - **Local notifications now, push later.** T-7/T-1 deadline reminders are
   scheduled on-device when a lifetime user tracks a claim, so the paid perk
   is real before the server pipeline (PIPELINE.md §5) ships. Server push

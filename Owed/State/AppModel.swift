@@ -16,36 +16,49 @@ final class AppModel {
     private static let profileDoneKey = "owed.profileDone"
     private static let receivedKey = "owed.received"
     private static let calendaredKey = "owed.calendared"
+    private static let calendarEventIDsKey = "owed.calendarEventIDs"
     private static let snapshotsKey = "owed.trackedSnapshots"
     private static let deadlineNoticesKey = "owed.deadlineNotices"
 
+    /// Persistence surface. Production uses `.standard`; tests inject an
+    /// isolated suite so parallel Swift Testing cases can't leak state.
+    private let defaults: UserDefaults
+
     /// Settlement ids the user has started claims for.
     private(set) var tracked: Set<String> {
-        didSet { UserDefaults.standard.set(Array(tracked), forKey: Self.trackedKey) }
+        didSet { defaults.set(Array(tracked), forKey: Self.trackedKey) }
     }
 
     /// The user's yes-answers from the match quiz. On-device only, never
     /// uploaded — local matching is the product's privacy story.
     var profile: Set<MatchKey> {
-        didSet { UserDefaults.standard.set(profile.map(\.rawValue), forKey: Self.profileKey) }
+        didSet { defaults.set(profile.map(\.rawValue), forKey: Self.profileKey) }
     }
 
     /// Whether the quiz has been offered (completed or skipped) — gates
     /// the first-launch prompt, not the feature.
     var profileCompleted: Bool {
-        didSet { UserDefaults.standard.set(profileCompleted, forKey: Self.profileDoneKey) }
+        didSet { defaults.set(profileCompleted, forKey: Self.profileDoneKey) }
     }
 
     /// Payouts the user has logged as received, by settlement id, in
     /// whole dollars — the "recovered with Owed" ledger.
     private(set) var received: [String: Int] {
-        didSet { UserDefaults.standard.set(received, forKey: Self.receivedKey) }
+        didSet { defaults.set(received, forKey: Self.receivedKey) }
     }
 
     /// Settlement ids whose deadline is already in the user's calendar,
     /// so reopening the sheet can't create duplicate events.
     private(set) var calendared: Set<String> {
-        didSet { UserDefaults.standard.set(Array(calendared), forKey: Self.calendaredKey) }
+        didSet { defaults.set(Array(calendared), forKey: Self.calendaredKey) }
+    }
+
+    /// EventKit identifiers for calendared claims. Used to update the
+    /// event in place when EventKit can resolve it; under write-only
+    /// access the lookup fails and reconciliation falls back to the
+    /// user-facing re-add flow (see CalendarHelper).
+    private(set) var calendarEventIDs: [String: String] {
+        didSet { defaults.set(calendarEventIDs, forKey: Self.calendarEventIDsKey) }
     }
 
     /// Local copy of every settlement the user tracks. The feed updates
@@ -55,7 +68,7 @@ final class AppModel {
     private(set) var trackedSnapshots: [String: Settlement] {
         didSet {
             if let data = try? JSONEncoder().encode(Array(trackedSnapshots.values)) {
-                UserDefaults.standard.set(data, forKey: Self.snapshotsKey)
+                defaults.set(data, forKey: Self.snapshotsKey)
             }
         }
     }
@@ -67,7 +80,7 @@ final class AppModel {
     private(set) var deadlineNotices: [DeadlineNotice] {
         didSet {
             if let data = try? JSONEncoder().encode(deadlineNotices) {
-                UserDefaults.standard.set(data, forKey: Self.deadlineNoticesKey)
+                defaults.set(data, forKey: Self.deadlineNoticesKey)
             }
         }
     }
@@ -103,13 +116,14 @@ final class AppModel {
     /// surfaced in the UI as a freshness/trust signal.
     private(set) var feedGeneratedAt: Date?
 
-    init() {
-        let defaults = UserDefaults.standard
+    init(defaults: UserDefaults = .standard) {
+        self.defaults = defaults
         tracked = Set(defaults.stringArray(forKey: Self.trackedKey) ?? [])
         profile = Set((defaults.stringArray(forKey: Self.profileKey) ?? []).compactMap(MatchKey.init))
         profileCompleted = defaults.bool(forKey: Self.profileDoneKey)
         received = (defaults.dictionary(forKey: Self.receivedKey) as? [String: Int]) ?? [:]
         calendared = Set(defaults.stringArray(forKey: Self.calendaredKey) ?? [])
+        calendarEventIDs = (defaults.dictionary(forKey: Self.calendarEventIDsKey) as? [String: String]) ?? [:]
 
         if let data = defaults.data(forKey: Self.snapshotsKey),
            let saved = try? JSONDecoder().decode([Settlement].self, from: data) {
@@ -182,11 +196,26 @@ final class AppModel {
                     DeadlineAlerts.cancel(for: fresh.id)
                     Task { await DeadlineAlerts.schedule(for: fresh) }
                 }
-                // The calendar event (if any) was written with the old
-                // date under write-only access; the notice is the user's
-                // cue to re-add it. Clearing the flag re-enables the
-                // "add to calendar" action for the new date.
-                calendared.remove(fresh.id)
+                // Best-effort calendar update. Under write-only access
+                // EventKit can't resolve our identifier — clear the flag
+                // so the notice's one-tap re-add is available. If full
+                // access (or a future OS) lets the update through, keep
+                // calendared and the stored identifier. Legacy installs
+                // that only have the boolean flag clear synchronously.
+                if let eventID = calendarEventIDs[fresh.id] {
+                    let settlement = fresh
+                    Task {
+                        let result = await CalendarHelper.updateDeadline(
+                            for: settlement, eventIdentifier: eventID
+                        )
+                        if result != .updated {
+                            calendared.remove(settlement.id)
+                            calendarEventIDs[settlement.id] = nil
+                        }
+                    }
+                } else if calendared.contains(fresh.id) {
+                    calendared.remove(fresh.id)
+                }
             }
         }
 
@@ -253,8 +282,20 @@ final class AppModel {
         received[s.id] = amount
     }
 
-    func markCalendared(_ s: Settlement) {
+    func markCalendared(_ s: Settlement, eventIdentifier: String) {
         calendared.insert(s.id)
+        calendarEventIDs[s.id] = eventIdentifier
+    }
+
+    /// One-tap re-add from a deadline-change notice when in-place update
+    /// wasn't possible (write-only calendar access).
+    func readdCalendar(for notice: DeadlineNotice) async -> Bool {
+        guard let s = trackedSnapshots[notice.settlementID]
+                ?? settlements.first(where: { $0.id == notice.settlementID })
+        else { return false }
+        guard let eventID = await CalendarHelper.addDeadline(for: s) else { return false }
+        markCalendared(s, eventIdentifier: eventID)
+        return true
     }
 
     /// Lifetime total the user has logged as recovered — the number that
@@ -278,6 +319,8 @@ final class AppModel {
         tracked.remove(s.id)
         trackedSnapshots[s.id] = nil
         received[s.id] = nil
+        calendared.remove(s.id)
+        calendarEventIDs[s.id] = nil
         deadlineNotices.removeAll { $0.settlementID == s.id }
         DeadlineAlerts.cancel(for: s.id)
     }

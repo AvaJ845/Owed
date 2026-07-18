@@ -7,18 +7,10 @@ import Testing
 @MainActor
 struct ReconciliationTests {
 
-    /// Keys AppModel persists under; cleared before each test so state
-    /// can't leak between tests (or in from a previous app run in the
-    /// test host).
-    private static let defaultsKeys = [
-        "owed.tracked", "owed.profile", "owed.profileDone", "owed.received",
-        "owed.calendared", "owed.trackedSnapshots", "owed.deadlineNotices",
-    ]
-
-    init() {
-        for key in Self.defaultsKeys {
-            UserDefaults.standard.removeObject(forKey: key)
-        }
+    /// Isolated suite so parallel Swift Testing cases can't share state
+    /// through `UserDefaults.standard`.
+    private func makeModel() -> AppModel {
+        AppModel(defaults: UserDefaults(suiteName: "owed.tests.\(UUID().uuidString)")!)
     }
 
     private func makeFeed(_ records: [(id: String, deadline: String)]) throws -> SettlementFeed {
@@ -51,7 +43,7 @@ struct ReconciliationTests {
     }
 
     @Test func removedSettlementSurvivesForTrackedClaim() throws {
-        let model = AppModel()
+        let model = makeModel()
         let first = try makeFeed([(id: "keep", deadline: "2027-03-01"), (id: "gone", deadline: "2027-04-01")])
         model.reconcile(with: first)
 
@@ -59,7 +51,6 @@ struct ReconciliationTests {
         model.track(gone)
         model.recordPayment(gone, amount: 32)
 
-        // Publisher removes "gone" from the feed entirely.
         let second = try makeFeed([(id: "keep", deadline: "2027-03-01")])
         model.reconcile(with: second)
 
@@ -69,33 +60,54 @@ struct ReconciliationTests {
     }
 
     @Test func deadlineChangeUpdatesSnapshotAndRaisesNotice() throws {
-        let model = AppModel()
+        let model = makeModel()
         let first = try makeFeed([(id: "s", deadline: "2027-03-01")])
         model.reconcile(with: first)
 
         let s = model.settlements[0]
         model.track(s)
-        model.markCalendared(s)
 
-        let second = try makeFeed([(id: "s", deadline: "2027-05-01")])
-        model.reconcile(with: second)
+        model.reconcile(with: try makeFeed([(id: "s", deadline: "2027-05-01")]))
 
-        let updated = model.trackedSettlements[0]
-        #expect(updated.deadline == FeedDay.date(from: "2027-05-01"))
-
+        #expect(model.trackedSettlements[0].deadline == FeedDay.date(from: "2027-05-01"))
         #expect(model.deadlineNotices.count == 1)
         let notice = model.deadlineNotices[0]
         #expect(notice.settlementID == "s")
         #expect(notice.oldDeadline == FeedDay.date(from: "2027-03-01"))
         #expect(notice.newDeadline == FeedDay.date(from: "2027-05-01"))
+    }
 
-        // The calendar event was written for the old date; the flag must
-        // clear so "Add to Calendar" re-arms for the new one.
+    @Test func deadlineChangeClearsLegacyCalendaredWithoutEventID() throws {
+        let suiteName = "owed.tests.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        suite.set(["s"], forKey: "owed.calendared")
+
+        let model = AppModel(defaults: suite)
+        model.reconcile(with: try makeFeed([(id: "s", deadline: "2027-03-01")]))
+        model.track(model.settlements[0])
+        #expect(model.calendared.contains("s"))
+        #expect(model.calendarEventIDs["s"] == nil)
+
+        model.reconcile(with: try makeFeed([(id: "s", deadline: "2027-05-01")]))
         #expect(!model.calendared.contains("s"))
     }
 
+    @Test func markCalendaredPersistsEventIdentifier() throws {
+        let suiteName = "owed.tests.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        let model = AppModel(defaults: suite)
+        model.reconcile(with: try makeFeed([(id: "s", deadline: "2027-03-01")]))
+        let s = model.settlements[0]
+        model.track(s)
+        model.markCalendared(s, eventIdentifier: "ek-abc")
+
+        let relaunched = AppModel(defaults: suite)
+        #expect(relaunched.calendared.contains("s"))
+        #expect(relaunched.calendarEventIDs["s"] == "ek-abc")
+    }
+
     @Test func unchangedDeadlineRaisesNoNotice() throws {
-        let model = AppModel()
+        let model = makeModel()
         let feed = try makeFeed([(id: "s", deadline: "2027-03-01")])
         model.reconcile(with: feed)
         model.track(model.settlements[0])
@@ -105,7 +117,7 @@ struct ReconciliationTests {
     }
 
     @Test func repeatDeadlineChangeReplacesOlderNotice() throws {
-        let model = AppModel()
+        let model = makeModel()
         model.reconcile(with: try makeFeed([(id: "s", deadline: "2027-03-01")]))
         model.track(model.settlements[0])
 
@@ -117,7 +129,7 @@ struct ReconciliationTests {
     }
 
     @Test func untrackDropsSnapshotPayoutAndNotices() throws {
-        let model = AppModel()
+        let model = makeModel()
         model.reconcile(with: try makeFeed([(id: "s", deadline: "2027-03-01")]))
         let s = model.settlements[0]
         model.track(s)
@@ -133,14 +145,14 @@ struct ReconciliationTests {
     }
 
     @Test func trackedStatePersistsAcrossModelRelaunch() throws {
-        let first = AppModel()
+        let suiteName = "owed.tests.\(UUID().uuidString)"
+        let suite = UserDefaults(suiteName: suiteName)!
+        let first = AppModel(defaults: suite)
         first.reconcile(with: try makeFeed([(id: "s", deadline: "2027-03-01")]))
         first.track(first.settlements[0])
         first.recordPayment(first.settlements[0], amount: 75)
 
-        // Fresh instance = app relaunch; everything must come back from
-        // UserDefaults, including the settlement snapshot itself.
-        let second = AppModel()
+        let second = AppModel(defaults: suite)
         #expect(second.trackedSettlements.map(\.id) == ["s"])
         #expect(second.totalRecovered == 75)
     }

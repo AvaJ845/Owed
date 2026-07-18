@@ -1,10 +1,29 @@
 import SwiftUI
 
+/// Bridges BGTaskScheduler (off-main, process-lifetime) to the live
+/// AppModel instance created by the SwiftUI `App` entry point.
+@MainActor
+enum FeedRefreshBridge {
+    static var refresh: (() async -> Void)?
+
+    nonisolated static func perform() async {
+        let work = await MainActor.run { refresh }
+        await work?()
+    }
+}
+
 @main
 struct OwedApp: App {
     @State private var model = AppModel()
     @State private var store = StoreManager()
     @Environment(\.scenePhase) private var scenePhase
+
+    init() {
+        // Must register before the app finishes launching.
+        FeedBackgroundRefresh.register {
+            await FeedRefreshBridge.perform()
+        }
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -17,14 +36,18 @@ struct OwedApp: App {
                 }
                 .task {
                     SpotlightIndexer.index(model.settlements)
+                    FeedRefreshBridge.refresh = { [model] in
+                        await model.refreshFeed()
+                    }
+                    FeedBackgroundRefresh.schedule()
                 }
                 // Refresh on launch and on every return to foreground —
-                // deadlines move on the order of days, so foreground
-                // refresh keeps tracked claims honest without background
-                // task infrastructure.
+                // deadlines move on the order of days; background refresh
+                // is the opportunistic backstop when the app stays closed.
                 .task(id: scenePhase) {
                     guard scenePhase == .active else { return }
                     await model.refreshFeed()
+                    FeedBackgroundRefresh.schedule()
                 }
         }
     }

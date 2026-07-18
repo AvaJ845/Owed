@@ -31,12 +31,16 @@ extension Color {
     }
 }
 
-/// Brand typography with graceful degradation.
+/// Brand typography with graceful degradation and Dynamic Type.
 ///
 /// If the OFL-licensed TTFs are present in Owed/Fonts (see Scripts/fetch-fonts.sh),
 /// we get the full engraved-banknote face: Fraunces for amounts, Public Sans for
 /// body, IBM Plex Mono for case numbers. If not, we fall back to the closest
 /// system designs (New York serif, SF, SF Mono) so the app is always shippable.
+///
+/// Both paths track the user's text size: custom faces via
+/// `Font.custom(_:size:relativeTo:)`, system fallbacks via `UIFontMetrics`.
+/// Prefer `OwedFont.icon` for SF Symbols next to copy so icons scale too.
 enum OwedFont {
     private static func has(_ name: String) -> Bool {
         UIFont(name: name, size: 12) != nil
@@ -48,31 +52,47 @@ enum OwedFont {
     private static let publicSans    = has("PublicSans-Regular")
     private static let plexMono      = has("IBMPlexMono-Medium")
 
+    private static func scaled(_ size: CGFloat, style: UIFont.TextStyle) -> CGFloat {
+        UIFontMetrics(forTextStyle: style).scaledValue(for: size)
+    }
+
     /// Amounts and headlines (Fraunces 650 in the RN scaffold).
     static func display(_ size: CGFloat) -> Font {
-        fraunces ? .custom("Fraunces-SemiBold", size: size)
-                 : .system(size: size, weight: .semibold, design: .serif)
+        fraunces
+            ? .custom("Fraunces-SemiBold", size: size, relativeTo: .title2)
+            : .system(size: scaled(size, style: .title2), weight: .semibold, design: .serif)
     }
 
     /// Heavier display cut (Fraunces 750).
     static func displayBold(_ size: CGFloat) -> Font {
-        frauncesBold ? .custom("Fraunces-Bold", size: size)
-                     : .system(size: size, weight: .bold, design: .serif)
+        frauncesBold
+            ? .custom("Fraunces-Bold", size: size, relativeTo: .title)
+            : .system(size: scaled(size, style: .title1), weight: .bold, design: .serif)
     }
 
     static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
-        guard publicSans else { return .system(size: size, weight: weight) }
+        guard publicSans else {
+            return .system(size: scaled(size, style: .body), weight: weight)
+        }
         switch weight {
-        case .bold:     return .custom("PublicSans-Bold", size: size)
-        case .semibold: return .custom("PublicSans-SemiBold", size: size)
-        default:        return .custom("PublicSans-Regular", size: size)
+        case .bold:     return .custom("PublicSans-Bold", size: size, relativeTo: .body)
+        case .semibold: return .custom("PublicSans-SemiBold", size: size, relativeTo: .body)
+        default:        return .custom("PublicSans-Regular", size: size, relativeTo: .body)
         }
     }
 
     /// Case numbers and docket stamps.
     static func mono(_ size: CGFloat) -> Font {
-        plexMono ? .custom("IBMPlexMono-Medium", size: size)
-                 : .system(size: size, weight: .medium, design: .monospaced)
+        plexMono
+            ? .custom("IBMPlexMono-Medium", size: size, relativeTo: .caption)
+            : .system(size: scaled(size, style: .caption1), weight: .medium, design: .monospaced)
+    }
+
+    /// SF Symbols next to Dynamic Type text — `.system(size:)` alone
+    /// ignores the user's text size and makes icons look stranded at
+    /// accessibility sizes.
+    static func icon(_ size: CGFloat, weight: Font.Weight = .semibold) -> Font {
+        .system(size: scaled(size, style: .body), weight: weight)
     }
 }
 
