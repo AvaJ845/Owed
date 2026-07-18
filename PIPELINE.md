@@ -8,7 +8,15 @@ burn trust (or invite liability); this spec builds review into the pipeline.
 ## Architecture
 
     [Sources] -> [Ingest workers] -> [Normalize + dedupe] -> [Review queue (human)]
-        -> [Publish (Postgres)] -> [API (FastAPI)] -> [App + Push alerts]
+        -> [Publish artifact] -> [CDN / static host] -> [App]
+                                         |
+                                         +-> [Push alerts (later, §5)]
+
+**Client distribution (shipped today):** the iOS app does **not** query an
+authenticated API. After human review, publish a versioned JSON snapshot plus
+detached Ed25519 signature; the app verifies, caches, and reconciles. See
+`docs/FEED_OPERATIONS.md`. Postgres/FastAPI remain the recommended *publisher*
+stack; they emit the signed file — they are not on the interactive read path.
 
 Recommended stack given your existing IP: FastAPI + Postgres + APScheduler/Celery
 (same shape as Kestrel's ingestion layer — reuse patterns, not code).
