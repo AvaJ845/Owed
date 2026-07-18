@@ -3,7 +3,7 @@
 **Audience:** engineers shipping this binary.  
 **Bar:** a wrong deadline or administrator URL is user harm, not a UI bug. Treat feed integrity and attestation as correctness, not polish.
 
-Companion docs: [`../README.md`](../README.md) (index), [`FEED_OPERATIONS.md`](FEED_OPERATIONS.md) (publish/sign), [`../PIPELINE.md`](../PIPELINE.md) (ingest → human review).
+Companion docs: [`../README.md`](../README.md) (index), [`ARCHITECTURE.md`](ARCHITECTURE.md) (full data-flow), [`FEED_OPERATIONS.md`](FEED_OPERATIONS.md) (publish/sign), [`../PIPELINE.md`](../PIPELINE.md) (ingest → human review).
 
 ---
 
@@ -45,9 +45,158 @@ If a change trades any row for convenience, it needs an explicit product decisio
 
 ---
 
-## 3. Build matrix — what “green” means
+## 3. Architecture & runtime data-flow workflows
 
-### 3.1 Interactive (Xcode)
+Deep reference (module map, trust boundaries, anti-patterns): **[`ARCHITECTURE.md`](ARCHITECTURE.md)**.  
+What follows is the build-facing workflow every engineer must internalize before changing feed, claims, or StoreKit code.
+
+### 3.1 Thesis
+
+The binary is a **signed-document browser + on-device claim ledger**. Networking exists only to replace a public, human-reviewed JSON artifact. User intent (quiz, tracked ids, logged payouts) never rides on those requests.
+
+### 3.2 Layered runtime
+
+```
+OwedApp
+  ├─ StoreManager          StoreKit 2 source of truth → mirrors lifetime into AppModel
+  ├─ scenePhase / BGTask   → AppModel.refreshFeed()
+  └─ RootView (tabs)
+        Find / Claims / Alerts  ←── @Environment(AppModel)
+
+AppModel (@MainActor)
+  ├─ settlements[]         Find catalog (from FeedStore)
+  ├─ tracked + snapshots   Claims ledger (feed cannot delete)
+  ├─ profile               MatchKey set (device-local)
+  └─ reconcile(_:)         alerts · calendar · notices · Spotlight
+
+FeedStore
+  bestAvailable() = disk cache ?? bundled JSON          ← first paint
+  refresh()       = GET JSON → GET .sig → verify → decode → cache
+```
+
+### 3.3 Workflow A — Cold launch → first paint → refresh
+
+```mermaid
+sequenceDiagram
+  participant App as OwedApp
+  participant AM as AppModel
+  participant FS as FeedStore
+  participant UI as Find tab
+
+  App->>AM: init
+  AM->>FS: bestAvailable()
+  FS-->>AM: cache or bundled
+  AM-->>UI: paint settlements immediately
+  Note over UI: Must not await network
+  App->>AM: refreshFeed on scenePhase active
+  AM->>FS: refresh verify+decode
+  alt success
+    FS-->>AM: SettlementFeed
+    AM->>AM: reconcile
+    AM-->>UI: updated list / notices
+  else fail or 304
+    FS-->>AM: nil
+    Note over UI: unchanged last-good
+  end
+```
+
+**Build implication:** if Find is empty on a clean install with airplane mode on, the **bundle** is defective — fail the build/smoke, do not “fix refresh.”
+
+### 3.4 Workflow B — Feed bytes on the wire (integrity path)
+
+```mermaid
+flowchart LR
+  CDN[CDN / GitHub raw] -->|GET JSON| FS[FeedStore]
+  CDN -->|GET .sig| FS
+  FS --> V{Ed25519 verify}
+  V -->|fail| X[Keep last-good]
+  V -->|ok| D{schemaVersion == 1}
+  D -->|fail| X
+  D -->|ok| G{generatedAt ≥ local}
+  G -->|no| X
+  G -->|yes| C[Atomic disk cache]
+  C --> R[reconcile]
+```
+
+Order is load-bearing: **signature before decode**. A well-formed malicious JSON must never enter `Settlement` validation.
+
+### 3.5 Workflow C — Reconcile (tracked-claim correctness)
+
+When `refreshFeed` returns a new feed, `reconcile` runs on the main actor:
+
+| Step | Action | Why |
+|------|--------|-----|
+| 1 | Capture `knownIDs` from current `settlements` | “New to this device” for match alerts |
+| 2 | For each **tracked** id in the new feed, write `trackedSnapshots[id]` | Feed updates cannot strand Claims |
+| 3 | If `deadline` changed: notice + reschedule T-7/T-1 (lifetime) + calendar best-effort | Stale alerts are the #1 live-data bug |
+| 4 | Replace `settlements` + `feedGeneratedAt` | Find tab catalog |
+| 5 | Spotlight reindex | Stale closed cases drop from search |
+| 6 | Lifetime ∩ profile match ∩ new id → local notification | Makes Alerts copy true pre-push |
+
+**Claims list source:** `trackedSettlements` reads **snapshots first**, then feed fallback — never `settlements.filter(tracked)` alone.
+
+### 3.6 Workflow D — User claim path (attestation → egress)
+
+```mermaid
+flowchart TD
+  Open[Open SettlementDetail] --> Gate{All eligibility + perjury?}
+  Gate -->|no| Dis[CTA disabled]
+  Gate -->|yes| Track[AppModel.track]
+  Track --> Snap[Persist snapshot]
+  Track --> Alert{lifetime?}
+  Alert -->|yes| Sched[Schedule T-7 / T-1 local]
+  Track --> Form[openURL https adminURL]
+  Form --> Safari[Administrator site - outside process]
+```
+
+Owed never POSTs claim forms. HTTPS `adminURL` is enforced at decode time.
+
+### 3.7 Workflow E — Commerce & alerts coupling
+
+```mermaid
+flowchart LR
+  SK[StoreManager.owned] --> L[AppModel.lifetime]
+  L -->|false→true| BF[Backfill DeadlineAlerts for all tracked]
+  L --> GateAlerts[Gates schedule on track / reconcile]
+```
+
+Entitlement lives in StoreKit; `lifetime` is a UI/alert mirror. Restore / `Transaction.updates` must be able to clear it on revocation.
+
+### 3.8 Workflow F — Calendar under write-only access
+
+1. `addDeadline` → persist `eventIdentifier` in `calendarEventIDs`.  
+2. On deadline move → `updateDeadline(eventIdentifier)`.  
+3. If EventKit cannot resolve the id (normal for write-only) → clear calendared; Claims notice offers **Add updated date to Calendar**.  
+
+Do not “fix” this by requesting full calendar read without a product/privacy change.
+
+### 3.9 Data that never leaves the device
+
+| Data | Storage | Network |
+|------|---------|---------|
+| Match quiz answers | `owed.profile` | None |
+| Tracked ids + snapshots | UserDefaults + in-memory | None |
+| Logged payouts | `owed.received` | None |
+| Feed GET | — | Public file only; no query params / cookies |
+
+### 3.10 Where to change what (review map)
+
+| If you are changing… | Start here | Also read |
+|----------------------|------------|-----------|
+| Refresh / CDN / signing | `FeedStore`, `FeedSigning` | FEED_OPERATIONS, Workflow B |
+| Decode / dates / ids | `Settlement`, `SettlementFeed` | OwedTests decode suite |
+| Claims / notices / alerts | `AppModel.reconcile` | Workflow C, ARCHITECTURE §4 |
+| Launch / BG | `OwedApp`, `FeedBackgroundRefresh` | Workflow A |
+| IAP | `StoreManager`, `PaywallView` | Workflow E |
+| Attestation CTA | `SettlementDetailView` | Workflow D |
+
+Full diagrams, state-key inventory, and anti-patterns: **[`ARCHITECTURE.md`](ARCHITECTURE.md)**.
+
+---
+
+## 4. Build matrix — what “green” means
+
+### 4.1 Interactive (Xcode)
 
 1. Open `Owed.xcodeproj`.
 2. Signing & Capabilities → select Development Team (bundle id above).
@@ -58,7 +207,7 @@ If a change trades any row for convenience, it needs an explicit product decisio
 
 StoreKit Configuration File is already on the shared scheme (`Owed.storekit`). Lifetime purchase/restore is testable without App Store Connect.
 
-### 3.2 Headless compile + install
+### 4.2 Headless compile + install
 
 ```bash
 # From the repository root:
@@ -78,7 +227,7 @@ xcrun simctl launch booted AvaResearchLLC.Owed
 
 **Pass criteria:** `** BUILD SUCCEEDED **`, process launches, Find tab shows settlements (never an empty list solely due to network — bundled floor must load).
 
-### 3.3 Automated tests (gate for feed/reconcile changes)
+### 4.3 Automated tests (gate for feed/reconcile changes)
 
 ```bash
 xcodebuild test -project Owed.xcodeproj -scheme Owed \
@@ -95,7 +244,7 @@ Tests inject isolated `UserDefaults` suites — do not reintroduce `UserDefaults
 
 **Pass criteria:** 0 failures. Feed or reconciliation PRs that land without extending these suites are incomplete.
 
-### 3.4 Cursor / XcodeBuildMCP
+### 4.4 Cursor / XcodeBuildMCP
 
 Project skill `/run-sim` (`.cursor/skills/run-sim/`) builds, launches, and screenshots via XcodeBuildMCP. Use for agent-driven verification; humans still own App Review judgment.
 
@@ -103,7 +252,7 @@ MCP config (`.cursor/mcp.json`) is **machine-local and gitignored** — not part
 
 ---
 
-## 4. Manual smoke checklist (every release candidate)
+## 5. Manual smoke checklist (every release candidate)
 
 Run after ⌘R on a clean simulator (Device → Erase All Content preferred for RC).
 
@@ -119,7 +268,7 @@ Run after ⌘R on a clean simulator (Device → Erase All Content preferred for 
 
 ---
 
-## 5. Configuration surfaces that ship in the binary
+## 6. Configuration surfaces that ship in the binary
 
 | Artifact | Why it matters |
 |----------|----------------|
@@ -131,7 +280,7 @@ Run after ⌘R on a clean simulator (Device → Erase All Content preferred for 
 
 ---
 
-## 6. Failure modes engineers must recognize
+## 7. Failure modes engineers must recognize
 
 | Symptom | Likely cause | Correct response |
 |---------|--------------|------------------|
@@ -144,7 +293,7 @@ Run after ⌘R on a clean simulator (Device → Erase All Content preferred for 
 
 ---
 
-## 7. App Store submission packet
+## 8. App Store submission packet
 
 **Binary**
 
@@ -168,7 +317,7 @@ Run after ⌘R on a clean simulator (Device → Erase All Content preferred for 
 
 ---
 
-## 8. Definition of done (engineering)
+## 9. Definition of done (engineering)
 
 A change is done when:
 
@@ -177,4 +326,5 @@ A change is done when:
 3. Smoke checklist items touched by the change were re-run.
 4. Feed edits include a new `.sig` (and `generatedAt` bump) — see FEED_OPERATIONS.
 5. Privacy copy and attestation behavior are unchanged unless the PR explicitly changes product posture.
-6. README / this doc updated if identifiers, schemes, or publish URLs changed.
+6. Architecture / data-flow docs updated if ownership, refresh order, or trust boundaries changed (`ARCHITECTURE.md`, this §3).
+7. README / this doc updated if identifiers, schemes, or publish URLs changed.

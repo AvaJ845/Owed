@@ -6,8 +6,10 @@ Native SwiftUI · StoreKit 2 · signed static feed · on-device matching · atte
 
 | Doc | Purpose |
 |-----|---------|
-| **[docs/BUILD.md](docs/BUILD.md)** | Build, test, smoke, App Store packet — engineering definition of done |
+| **[docs/BUILD.md](docs/BUILD.md)** | Build, test, smoke, **§3 data-flow workflows**, App Store packet |
+| **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** | Fellow-level runtime architecture, trust boundaries, state inventory |
 | **[docs/FEED_OPERATIONS.md](docs/FEED_OPERATIONS.md)** | Sign, publish, incident response for the settlement feed |
+| **[docs/FEED_REVIEW.md](docs/FEED_REVIEW.md)** | Provenance log for the currently published human-reviewed records |
 | **[PIPELINE.md](PIPELINE.md)** | Ingest → normalize → **human review** → publish (server-side intent) |
 
 ---
@@ -69,7 +71,7 @@ CLI build/test and Cursor `/run-sim`: see [docs/BUILD.md](docs/BUILD.md).
 ```
 Owed/                 app sources (filesystem-synced Xcode target)
 OwedTests/            Swift Testing — decode, reconcile, signing
-docs/                 BUILD + FEED_OPERATIONS (this engineering bar)
+docs/                 BUILD (§3 workflows) + ARCHITECTURE + FEED_OPERATIONS
 Scripts/sign-feed.sh  only supported signing entrypoint
 Scripts/keys/         private key (gitignored — back up offline)
 PIPELINE.md           upstream data pipeline spec
@@ -109,4 +111,4 @@ Full runbook, key rotation, and incident response: **[docs/FEED_OPERATIONS.md](d
 
 ## Before you ship a binary
 
-Work the checklist in [docs/BUILD.md §7](docs/BUILD.md) — signing team, icon, IAP, review notes, privacy manifest, production feed content (not example hosts), CDN cutover when you leave GitHub raw.
+Work the checklist in [docs/BUILD.md §8](docs/BUILD.md) — signing team, icon, IAP, review notes, privacy manifest, production feed content (not example hosts), CDN cutover when you leave GitHub raw.

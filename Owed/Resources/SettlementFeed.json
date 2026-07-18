@@ -1,97 +1,97 @@
 {
   "schemaVersion": 1,
-  "generatedAt": "2026-07-18T00:00:00Z",
+  "generatedAt": "2026-07-18T22:05:00Z",
   "minAppVersion": "1.0",
   "settlements": [
     {
-      "id": "s1",
-      "caseNo": "No. 3:24-cv-01881",
-      "name": "StreamBox Privacy Settlement",
-      "category": "Data privacy — viewing history shared with advertisers",
-      "payoutLo": 38,
-      "payoutHi": 120,
-      "payoutTerms": "per class member",
-      "deadline": "2026-07-29",
+      "id": "disney-online-tv-biddle",
+      "caseNo": "No. 5:22-cv-07317-EJD",
+      "name": "Disney YouTube TV / DirecTV Stream Settlement",
+      "category": "Antitrust — alleged inflated live TV streaming prices",
+      "payoutLo": 5,
+      "payoutHi": 50,
+      "payoutTerms": "pro rata by subscription length; final amount TBD after claims",
+      "deadline": "2026-09-08",
       "receiptRequired": false,
-      "adminURL": "https://example-administrator.com/streambox",
+      "adminURL": "https://www.onlinetvsettlement.com/",
       "eligibility": [
-        "I had a StreamBox account between Jan 2019 and Mar 2024",
-        "I resided in the U.S. during that period"
+        "I purchased a YouTube TV and/or DirecTV Stream (including DirecTV Now / AT&T TV Now) subscription between April 1, 2019 and March 31, 2026",
+        "I understand payments are pro rata from the net settlement fund and not a fixed dollar amount"
       ],
       "matchKeys": ["streaming"],
-      "verifiedAt": "2026-07-16"
+      "verifiedAt": "2026-07-18"
     },
     {
-      "id": "s2",
-      "caseNo": "No. 1:23-cv-04412",
-      "name": "MegaMart Overcharge Settlement",
-      "category": "False advertising — unit pricing on weighed goods",
-      "payoutLo": 25,
-      "payoutHi": 500,
-      "payoutTerms": "depends on purchase history",
-      "deadline": "2026-08-23",
-      "receiptRequired": false,
-      "adminURL": "https://example-administrator.com/megamart",
-      "eligibility": [
-        "I bought weighed grocery items at MegaMart 2020–2023",
-        "I don't have receipts but purchased at least once"
-      ],
-      "matchKeys": ["groceries"],
-      "verifiedAt": "2026-07-17"
-    },
-    {
-      "id": "s3",
-      "caseNo": "No. 5:22-cv-09174",
-      "name": "Handset Battery Throttling",
-      "category": "Consumer electronics — undisclosed performance limits",
-      "payoutLo": 65,
-      "payoutHi": 65,
-      "payoutTerms": "per eligible device",
-      "deadline": "2026-09-14",
+      "id": "google-assistant-privacy",
+      "caseNo": "No. 4:19-cv-04286",
+      "name": "Google Assistant Privacy Settlement",
+      "category": "Privacy — Assistant recordings / Google-made devices",
+      "payoutLo": 2,
+      "payoutHi": 168,
+      "payoutTerms": "point-based from $68M fund; ~$2–$56/device (up to 3) or ~$2–$10 privacy class (counsel estimates)",
+      "deadline": "2026-08-27",
       "receiptRequired": true,
-      "adminURL": "https://example-administrator.com/handset",
+      "adminURL": "https://www.googleassistantprivacylitigation.com/",
       "eligibility": [
-        "I owned an affected handset model (serial check at filing)",
-        "Device was purchased new, not refurbished"
+        "Between May 18, 2016 and March 19, 2026 I purchased a Google-made device (e.g. Pixel, Nest/Home) and/or my communications were recorded by Google Assistant via a False Accept or disclosed to a review vendor",
+        "I will submit a claim on the official A.B. Data settlement site and provide purchase proof if claiming as a Purchaser Class member"
       ],
       "matchKeys": ["smartphone"],
-      "verifiedAt": "2026-07-14"
+      "verifiedAt": "2026-07-18"
     },
     {
-      "id": "s4",
-      "caseNo": "No. 2:24-cv-00317",
-      "name": "FastFashion Text Spam (TCPA)",
-      "category": "Telemarketing — texts after opt-out",
-      "payoutLo": 150,
-      "payoutHi": 900,
-      "payoutTerms": "per claimant",
-      "deadline": "2026-08-10",
-      "receiptRequired": false,
-      "adminURL": "https://example-administrator.com/fastfashion",
-      "eligibility": [
-        "I received marketing texts after replying STOP",
-        "My number can be matched in defendant's records"
-      ],
-      "matchKeys": ["spamTexts"],
-      "verifiedAt": "2026-07-16"
-    },
-    {
-      "id": "s5",
-      "caseNo": "No. 4:23-cv-06650",
-      "name": "CreditWatch Data Breach",
-      "category": "Data breach — SSNs and DOBs exposed",
+      "id": "circle-k-gas-express-2024",
+      "caseNo": "No. 25EV012357",
+      "name": "Circle K / Gas Express Data Incident Settlement",
+      "category": "Data breach — May 2024 cyberattack (names / SSNs allegedly accessed)",
       "payoutLo": 50,
-      "payoutHi": 5000,
-      "payoutTerms": "up to, with documented losses",
-      "deadline": "2026-11-15",
-      "receiptRequired": true,
-      "adminURL": "https://example-administrator.com/creditwatch",
+      "payoutHi": 2000,
+      "payoutTerms": "$50 alternate cash (capped) or up to $2,000 documented losses; plus credit monitoring",
+      "deadline": "2026-09-03",
+      "receiptRequired": false,
+      "adminURL": "https://www.gasexpressdatasettlement.com/",
       "eligibility": [
-        "I received a breach notice or can verify exposure",
-        "I can document time or out-of-pocket losses for higher tiers"
+        "I am a U.S. resident who was sent notice that my Private Information was impacted in the May 2024 Gas Express, LLC d/b/a Circle K data incident",
+        "I understand the $50 alternate-cash option is capped (first 700 valid claims) and documented-loss claims require receipts"
       ],
       "matchKeys": ["breachNotice"],
-      "verifiedAt": "2026-07-13"
+      "verifiedAt": "2026-07-18"
+    },
+    {
+      "id": "fastwyre-tcpa",
+      "caseNo": "No. CV-25-127556",
+      "name": "Fastwyre / SP Data Digital TCPA Settlement",
+      "category": "TCPA — calls to numbers on the National Do Not Call Registry",
+      "payoutLo": 50,
+      "payoutHi": 182,
+      "payoutTerms": "up to $181.57 per valid claim (per settlement site)",
+      "deadline": "2026-08-03",
+      "receiptRequired": false,
+      "adminURL": "https://www.fastwyretcpasettlement.com/",
+      "eligibility": [
+        "I received calls from SP Data Digital, LLC and/or American Broadband Holding Company d/b/a Fastwyre Broadband while my number was on the National Do Not Call Registry for more than 30 days",
+        "I can complete a Claim Form using the Claim ID and PIN from the official postcard notice (or as instructed on the settlement site)"
+      ],
+      "matchKeys": ["spamTexts"],
+      "verifiedAt": "2026-07-18"
+    },
+    {
+      "id": "fanatics-handling-fee",
+      "caseNo": "No. 2026-001293-CA-01",
+      "name": "Fanatics Handling Fee Settlement",
+      "category": "False advertising — handling fees with free/low-rate shipping claims",
+      "payoutLo": 10,
+      "payoutHi": 10,
+      "payoutTerms": "two $5 Fanatics.com vouchers ($10 total); not cash",
+      "deadline": "2026-08-27",
+      "receiptRequired": false,
+      "adminURL": "https://handlingfeesettlement.com/",
+      "eligibility": [
+        "I purchased merchandise through Fanatics websites between May 6, 2018 and March 30, 2026 and was assessed and paid a handling fee",
+        "I understand benefits are Fanatics vouchers (not cash) and the Claim Form may require the Claim ID and PIN from the email notice"
+      ],
+      "matchKeys": [],
+      "verifiedAt": "2026-07-18"
     }
   ]
 }
