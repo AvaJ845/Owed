@@ -117,3 +117,21 @@ extension View {
         modifier(DocketSurface(cornerRadius: cornerRadius))
     }
 }
+
+// MARK: - Motion
+
+/// Spatial transitions that respect Reduce Motion. Animation clarifies
+/// state change (filter, tracked → settled); it is never decoration alone.
+enum OwedMotion {
+    static func listChange(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .spring(response: 0.38, dampingFraction: 0.86)
+    }
+
+    static func statusChange(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? nil : .spring(response: 0.45, dampingFraction: 0.82)
+    }
+
+    static func selection(reduceMotion: Bool) -> Animation? {
+        reduceMotion ? .easeOut(duration: 0.12) : .snappy(duration: 0.18)
+    }
+}

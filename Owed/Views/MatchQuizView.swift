@@ -79,9 +79,10 @@ struct MatchQuizView: View {
     private var privacyNote: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "iphone.and.arrow.right.inward")
-                .font(.system(size: 16, weight: .semibold))
+                .font(OwedFont.icon(16))
                 .foregroundStyle(T.green)
                 .padding(.top, 1)
+                .accessibilityHidden(true)
             Text("Your answers never leave this phone. Matching happens on device — nothing is uploaded, no account, ever.")
                 .font(OwedFont.body(11.5))
                 .foregroundStyle(T.mut)
@@ -104,9 +105,10 @@ private struct QuizRow: View {
         Button(action: toggle) {
             HStack(spacing: 12) {
                 Image(systemName: key.icon)
-                    .font(.system(size: 16, weight: .medium))
+                    .font(OwedFont.icon(16, weight: .medium))
                     .foregroundStyle(isOn ? T.green : T.mut)
                     .frame(width: 24)
+                    .accessibilityHidden(true)
 
                 Text(key.question)
                     .font(OwedFont.body(13.5, weight: .semibold))
@@ -121,11 +123,12 @@ private struct QuizRow: View {
                         .strokeBorder(isOn ? T.green : T.line, lineWidth: 1.5)
                     if isOn {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 11, weight: .bold))
+                            .font(OwedFont.icon(11, weight: .bold))
                             .foregroundStyle(.white)
                     }
                 }
                 .frame(width: 22, height: 22)
+                .accessibilityHidden(true)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 13)
@@ -137,6 +140,8 @@ private struct QuizRow: View {
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: isOn)
+        .accessibilityLabel(key.question)
+        .accessibilityValue(isOn ? "Selected" : "Not selected")
         .accessibilityAddTraits(isOn ? [.isSelected] : [])
     }
 }

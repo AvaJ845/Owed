@@ -39,7 +39,7 @@ struct DocketCard: View {
                     Tag(text: statusText(status), fg: statusColors(status).fg, bg: statusColors(status).bg)
                 } else {
                     if isMatch {
-                        Tag(text: "✦ LIKELY MATCH", fg: T.gold, bg: T.goldSoft)
+                        Tag(text: "LIKELY MATCH", fg: T.gold, bg: T.goldSoft)
                     }
                     Tag(
                         text: settlement.receiptRequired ? "DOCUMENTATION REQUIRED" : "NO RECEIPT NEEDED",

@@ -319,6 +319,18 @@ Threat model for the feed: **integrity**, not confidentiality. The JSON is publi
 | Server push | Additive for discovery; keep local T-7/T-1 as offline backstop |
 | Schema v2 | New client + dual-publish or forced upgrade; never silently guess |
 | Full calendar sync | Product + privacy copy change; not a silent EventKit entitlement bump |
+| Home Screen widget | Requires App Group + shared UserDefaults suite; never put quiz answers in the widget timeline |
+| Live Activities | Only if a claim has a true time-bounded public event (rare); do not invent “dinner tally” UX for settlements |
+
+### Fellow platform decisions (what we deliberately skip)
+
+| Pattern | Verdict for Owed |
+|---------|------------------|
+| CloudKit sync of claims / quiz | **No.** Privacy contract is on-device only; multi-person IOU sync is a different product. |
+| SwiftData for the ledger | Deferred — UserDefaults + JSON snapshots are enough at current volume; migrate when App Group / widget forces a shared store. |
+| App Intents / Spotlight deep links | **Yes** — `OwedAppIntents`, `AppNavigation`, `CSSearchableItemActionType`. |
+| Face ID on My claims | **Yes** — session unlock via `ClaimsPrivacyGate`; locks on background. |
+| SwipeActions / pull-to-refresh / Reduce Motion springs | **Yes** — HIG friction reduction without changing the product. |
 
 ---
 

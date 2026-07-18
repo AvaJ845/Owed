@@ -6,11 +6,21 @@ enum FeedFilter: String, CaseIterable, Identifiable {
 
     var label: String {
         switch self {
-        case .forYou: "✦ For you"
+        case .forYou: "For you"
         case .all: "All"
         case .soon: "Closing soon"
         case .noReceipt: "No receipt"
         case .high: "$500+"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .forYou: "For you — settlements matching your quiz"
+        case .all: "All settlements"
+        case .soon: "Closing soon"
+        case .noReceipt: "No receipt needed"
+        case .high: "Payout five hundred dollars or more"
         }
     }
 
@@ -29,11 +39,14 @@ enum FeedFilter: String, CaseIterable, Identifiable {
 struct FindView: View {
     @Environment(AppModel.self) private var model
     @Environment(StoreManager.self) private var store
+    @Environment(AppNavigation.self) private var navigation
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var filter: FeedFilter = .all
     @State private var selected: Settlement?
     @State private var showPaywall = false
     @State private var showQuiz = false
+    @Namespace private var filterNamespace
 
     private var visibleFilters: [FeedFilter] {
         model.profile.isEmpty
@@ -65,12 +78,20 @@ struct FindView: View {
                                 )
                             }
                             .buttonStyle(.plain)
+                            .transition(.asymmetric(
+                                insertion: .opacity.combined(with: .move(edge: .trailing)),
+                                removal: .opacity
+                            ))
                         }
                     }
                     .padding(.horizontal, 16)
-                    .animation(.snappy(duration: 0.25), value: filter)
+                    .animation(OwedMotion.listChange(reduceMotion: reduceMotion), value: filter)
+                    .animation(OwedMotion.listChange(reduceMotion: reduceMotion), value: feed.map(\.id))
                 }
                 .padding(.bottom, 24)
+            }
+            .refreshable {
+                await model.refreshFeed()
             }
         }
         .background(T.paper)
@@ -100,6 +121,36 @@ struct FindView: View {
                 showQuiz = true
             }
         }
+        .onChange(of: navigation.pendingFindFilter) { _, pending in
+            guard let pending else { return }
+            if visibleFilters.contains(pending) {
+                withAnimation(OwedMotion.listChange(reduceMotion: reduceMotion)) {
+                    filter = pending
+                }
+            }
+            navigation.pendingFindFilter = nil
+        }
+        .onChange(of: navigation.pendingSettlementID) { _, id in
+            guard let id else { return }
+            openDeepLinkedSettlement(id: id)
+        }
+        .onAppear {
+            if let id = navigation.pendingSettlementID {
+                openDeepLinkedSettlement(id: id)
+            }
+            if let pending = navigation.pendingFindFilter, visibleFilters.contains(pending) {
+                filter = pending
+                navigation.pendingFindFilter = nil
+            }
+        }
+    }
+
+    private func openDeepLinkedSettlement(id: String) {
+        let match = model.settlements.first { $0.id == id }
+            ?? model.trackedSettlements.first { $0.id == id }
+        navigation.pendingSettlementID = nil
+        guard let match else { return }
+        selected = match
     }
 
     private var topBar: some View {
@@ -107,6 +158,7 @@ struct FindView: View {
             (Text("Owed") + Text(".").foregroundStyle(T.green))
                 .font(OwedFont.displayBold(24))
                 .foregroundStyle(T.ink)
+                .accessibilityAddTraits(.isHeader)
 
             Spacer()
 
@@ -132,6 +184,7 @@ struct FindView: View {
                     .overlay(Capsule().strokeBorder(model.lifetime ? T.green : T.gold, lineWidth: 1))
             }
             .buttonStyle(.plain)
+            .accessibilityLabel(model.lifetime ? "Lifetime unlocked" : "Get Lifetime for \(store.displayPrice)")
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
@@ -182,6 +235,7 @@ struct FindView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .docketSurface(cornerRadius: 14)
         .padding(.top, 8)
+        .accessibilityElement(children: .combine)
     }
 
     private var forYouEmptyState: some View {
@@ -207,16 +261,31 @@ struct FindView: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(visibleFilters) { f in
-                    Button { filter = f } label: {
+                    Button {
+                        withAnimation(OwedMotion.selection(reduceMotion: reduceMotion)) {
+                            filter = f
+                        }
+                    } label: {
                         Text(f.label)
                             .font(OwedFont.body(12.5, weight: .semibold))
                             .foregroundStyle(filter == f ? T.paper : T.ink)
                             .padding(.horizontal, 13)
                             .padding(.vertical, 7)
-                            .background(filter == f ? T.ink : T.card, in: .capsule)
+                            .background {
+                                if filter == f {
+                                    Capsule()
+                                        .fill(T.ink)
+                                        .matchedGeometryEffect(id: "filterChip", in: filterNamespace)
+                                } else {
+                                    Capsule()
+                                        .fill(T.card)
+                                }
+                            }
                             .overlay(Capsule().strokeBorder(filter == f ? T.ink : T.line, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(f.accessibilityLabel)
+                    .accessibilityAddTraits(filter == f ? [.isSelected] : [])
                 }
             }
             .padding(.horizontal, 20)
@@ -229,4 +298,5 @@ struct FindView: View {
     FindView()
         .environment(AppModel())
         .environment(StoreManager())
+        .environment(AppNavigation())
 }

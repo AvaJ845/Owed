@@ -10,11 +10,13 @@ struct SettlementDetailView: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     @State private var checks: [Bool]
     @State private var attested = false
     @State private var calendarFailed = false
     @State private var showPayoutAlert = false
+    @State private var showStopConfirm = false
     @State private var payoutText = ""
 
     init(settlement: Settlement) {
@@ -59,13 +61,28 @@ struct SettlementDetailView: View {
                 .keyboardType(.numberPad)
             Button("Save") {
                 if let amount = Int(payoutText.filter(\.isNumber)), amount > 0 {
-                    model.recordPayment(settlement, amount: amount)
+                    withAnimation(OwedMotion.statusChange(reduceMotion: reduceMotion)) {
+                        model.recordPayment(settlement, amount: amount)
+                    }
                 }
                 payoutText = ""
             }
             Button("Cancel", role: .cancel) { payoutText = "" }
         } message: {
             Text("Got your check or deposit? Log it and Owed keeps your recovered total.")
+        }
+        .confirmationDialog(
+            "Stop tracking this claim?",
+            isPresented: $showStopConfirm,
+            titleVisibility: .visible
+        ) {
+            Button("Stop tracking", role: .destructive) {
+                model.untrack(settlement)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Your logged payout stays on this device. You can start the claim again from Find.")
         }
     }
 
@@ -101,15 +118,17 @@ struct SettlementDetailView: View {
                             in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
         .disabled(!ready)
-        .animation(.easeOut(duration: 0.2), value: ready)
+        .animation(OwedMotion.statusChange(reduceMotion: reduceMotion), value: ready)
         .sensoryFeedback(.success, trigger: ready) { $0 == false && $1 == true }
-        .accessibilityHint(ready ? "" : "Check every eligibility box and the attestation to enable")
+        .accessibilityLabel("Start claim and track it")
+        .accessibilityHint(ready ? "Opens the official claim form and tracks this settlement" : "Check every eligibility box and the attestation to enable")
 
         Button("Not for me") { dismiss() }
             .font(OwedFont.body(13.5, weight: .semibold))
             .foregroundStyle(T.mut)
             .frame(maxWidth: .infinity)
             .padding(12)
+            .accessibilityLabel("Dismiss — not for me")
     }
 
     /// The post-track flow: no re-attestation, just status and one-tap
@@ -130,6 +149,7 @@ struct SettlementDetailView: View {
         }
         .buttonStyle(.plain)
         .padding(.bottom, 8)
+        .accessibilityLabel("Open official claim form")
 
         if !settlement.closed {
             // Added-state lives in the model so a re-opened sheet can't
@@ -159,13 +179,15 @@ struct SettlementDetailView: View {
         }
 
         if case .paid(let amount) = model.status(for: settlement) {
-            Text("You recovered \(amount.usd) from this settlement 🎉")
+            Text("You recovered \(amount.usd) from this settlement.")
                 .font(OwedFont.body(13, weight: .semibold))
                 .foregroundStyle(T.green)
                 .frame(maxWidth: .infinity)
                 .padding(12)
                 .background(T.greenSoft, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
                 .padding(.bottom, 8)
+                .transition(.scale.combined(with: .opacity))
+                .accessibilityLabel("You recovered \(amount.usd) from this settlement")
         } else {
             secondaryButton("Payment received? Log it", icon: "banknote") {
                 showPayoutAlert = true
@@ -173,13 +195,13 @@ struct SettlementDetailView: View {
         }
 
         Button("Stop tracking this claim") {
-            model.untrack(settlement)
-            dismiss()
+            showStopConfirm = true
         }
         .font(OwedFont.body(13.5, weight: .semibold))
         .foregroundStyle(T.stamp)
         .frame(maxWidth: .infinity)
         .padding(12)
+        .accessibilityLabel("Stop tracking this claim")
     }
 
     private var statusCard: some View {
@@ -256,9 +278,10 @@ struct SettlementDetailView: View {
     private var verifiedRow: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "checkmark.seal.fill")
-                .font(.system(size: 16, weight: .semibold))
+                .font(OwedFont.icon(16))
                 .foregroundStyle(T.green)
                 .padding(.top, 1)
+                .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 Text("VERIFIED \(settlement.verifiedAt.formatted(date: .abbreviated, time: .omitted).uppercased())")
                     .font(OwedFont.mono(11))
@@ -317,7 +340,7 @@ private struct CheckRow: View {
                         .strokeBorder(isOn ? T.green : T.line, lineWidth: 1.5)
                     if isOn {
                         Image(systemName: "checkmark")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(OwedFont.icon(10, weight: .bold))
                             .foregroundStyle(.white)
                     }
                 }
@@ -340,7 +363,10 @@ private struct CheckRow: View {
         }
         .buttonStyle(.plain)
         .sensoryFeedback(.selection, trigger: isOn)
+        .accessibilityLabel(label)
+        .accessibilityValue(isOn ? "Checked" : "Unchecked")
         .accessibilityAddTraits(isOn ? [.isSelected] : [])
+        .accessibilityHint("Double tap to toggle")
     }
 }
 

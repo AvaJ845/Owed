@@ -9,7 +9,10 @@ import StoreKit
 /// for Ask-to-Buy/refunds, and `AppStore.sync()` for restore — a dependency
 /// would add an SDK, a dashboard, and a privacy-manifest entry to replace
 /// ~80 lines. Revisit only if the backend needs server-side entitlements.
-@Observable
+///
+/// `@MainActor` matches `AppModel`: entitlement flags are observed by views
+/// and must never race the UI isolation domain.
+@Observable @MainActor
 final class StoreManager {
     static let lifetimeID = "AvaResearchLLC.Owed.lifetime"
 
@@ -18,12 +21,11 @@ final class StoreManager {
     private(set) var purchasing = false
     private(set) var loadFailed = false
 
-    private var updatesTask: Task<Void, Never>?
-
     var displayPrice: String { product?.displayPrice ?? "$5.99" }
 
     init() {
-        updatesTask = Task { [weak self] in
+        // Process-lifetime listener; StoreManager outlives UI so no deinit cancel.
+        Task { [weak self] in
             // Ask-to-Buy approvals, refunds, family-share revocation.
             for await update in Transaction.updates {
                 await self?.handle(update)
@@ -31,8 +33,6 @@ final class StoreManager {
         }
         Task { await bootstrap() }
     }
-
-    deinit { updatesTask?.cancel() }
 
     private func bootstrap() async {
         await refreshEntitlement()
@@ -44,7 +44,6 @@ final class StoreManager {
         }
     }
 
-    @MainActor
     func purchase() async {
         guard let product, !purchasing else { return }
         purchasing = true
@@ -63,7 +62,6 @@ final class StoreManager {
         }
     }
 
-    @MainActor
     func restore() async {
         try? await AppStore.sync()
         await refreshEntitlement()
