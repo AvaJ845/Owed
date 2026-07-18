@@ -6,10 +6,21 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXContainerItemProxy section */
+		A200000000000000000000A9 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A100000000000000000000F1 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A100000000000000000000E1;
+			remoteInfo = Owed;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		A100000000000000000000A1 /* Owed.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Owed.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A100000000000000000000A2 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A100000000000000000000A3 /* Owed.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Owed.storekit; sourceTree = "<group>"; };
+		A200000000000000000000A1 /* OwedTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = OwedTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -18,10 +29,22 @@
 			path = Owed;
 			sourceTree = "<group>";
 		};
+		A200000000000000000000B1 /* OwedTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = OwedTests;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		A100000000000000000000C1 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A200000000000000000000C1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -35,6 +58,7 @@
 			isa = PBXGroup;
 			children = (
 				A100000000000000000000B1 /* Owed */,
+				A200000000000000000000B1 /* OwedTests */,
 				A100000000000000000000A2 /* Info.plist */,
 				A100000000000000000000A3 /* Owed.storekit */,
 				A100000000000000000000D2 /* Products */,
@@ -45,6 +69,7 @@
 			isa = PBXGroup;
 			children = (
 				A100000000000000000000A1 /* Owed.app */,
+				A200000000000000000000A1 /* OwedTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -74,7 +99,37 @@
 			productReference = A100000000000000000000A1 /* Owed.app */;
 			productType = "com.apple.product-type.application";
 		};
+		A200000000000000000000E1 /* OwedTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = A200000000000000000000F3 /* Build configuration list for PBXNativeTarget "OwedTests" */;
+			buildPhases = (
+				A200000000000000000000C2 /* Sources */,
+				A200000000000000000000C1 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				A200000000000000000000A8 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				A200000000000000000000B1 /* OwedTests */,
+			);
+			name = OwedTests;
+			packageProductDependencies = (
+			);
+			productName = OwedTests;
+			productReference = A200000000000000000000A1 /* OwedTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXTargetDependency section */
+		A200000000000000000000A8 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A100000000000000000000E1 /* Owed */;
+			targetProxy = A200000000000000000000A9 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin PBXProject section */
 		A100000000000000000000F1 /* Project object */ = {
@@ -86,6 +141,10 @@
 				TargetAttributes = {
 					A100000000000000000000E1 = {
 						CreatedOnToolsVersion = 16.0;
+					};
+					A200000000000000000000E1 = {
+						CreatedOnToolsVersion = 16.0;
+						TestTargetID = A100000000000000000000E1;
 					};
 				};
 			};
@@ -104,6 +163,7 @@
 			projectRoot = "";
 			targets = (
 				A100000000000000000000E1 /* Owed */,
+				A200000000000000000000E1 /* OwedTests */,
 			);
 		};
 /* End PBXProject section */
@@ -120,6 +180,13 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		A100000000000000000000C2 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A200000000000000000000C2 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -295,6 +362,42 @@
 			};
 			name = Release;
 		};
+		A20000000000000000000103 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AvaResearchLLC.OwedTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Owed.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Owed";
+			};
+			name = Debug;
+		};
+		A20000000000000000000104 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = AvaResearchLLC.OwedTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Owed.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Owed";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -312,6 +415,15 @@
 			buildConfigurations = (
 				A10000000000000000000103 /* Debug */,
 				A10000000000000000000104 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		A200000000000000000000F3 /* Build configuration list for PBXNativeTarget "OwedTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				A20000000000000000000103 /* Debug */,
+				A20000000000000000000104 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

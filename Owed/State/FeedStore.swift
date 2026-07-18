@@ -27,6 +27,20 @@ enum FeedStore {
         subsystem: Bundle.main.bundleIdentifier ?? "Owed", category: "feedstore"
     )
 
+    /// Ephemeral on purpose: no cookie store, no credential cache, no
+    /// persistent URL cache — the shared session would quietly accumulate
+    /// state around a request whose whole point is carrying none. Tight
+    /// timeout because this runs on foreground; a slow CDN must never
+    /// hold up anything (the last-good feed is already showing).
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.ephemeral
+        config.httpShouldSetCookies = false
+        config.httpCookieAcceptPolicy = .never
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        return URLSession(configuration: config)
+    }()
+
     /// Best locally available feed, newest first. Synchronous and cheap —
     /// safe to call during app init.
     static func bestAvailable() -> SettlementFeed? {
@@ -47,7 +61,7 @@ enum FeedStore {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await URLSession.shared.data(for: request)
+            (data, response) = try await session.data(for: request)
         } catch {
             log.info("Feed refresh skipped (offline or unreachable): \(String(describing: error))")
             return nil

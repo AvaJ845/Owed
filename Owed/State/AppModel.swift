@@ -5,7 +5,11 @@ import UserNotifications
 /// App state. Tracked claim ids persist across launches; the lifetime
 /// entitlement itself is owned by StoreManager (StoreKit is the source
 /// of truth), mirrored here for cheap view access.
-@Observable
+///
+/// @MainActor by contract, not convention: every mutation site is UI-
+/// driven or reconciliation, and observers are views. The network hop in
+/// `refreshFeed` happens inside FeedStore off this actor.
+@Observable @MainActor
 final class AppModel {
     private static let trackedKey = "owed.tracked"
     private static let profileKey = "owed.profile"
@@ -134,16 +138,29 @@ final class AppModel {
 
     // MARK: Feed refresh + reconciliation (Step 3)
 
+    /// True while a refresh is in flight; also the overlap guard so
+    /// rapid background/foreground cycles can't interleave reconciles.
+    private var refreshing = false
+
     /// Fetches the latest feed and reconciles it against local state.
     /// Correctness order matters: tracked snapshots and deadline alerts
     /// update before the visible list, so the UI can't show a new
     /// deadline while notifications still fire for the old one.
     func refreshFeed() async {
+        guard !refreshing else { return }
+        refreshing = true
+        defer { refreshing = false }
         guard let feed = await FeedStore.refresh() else { return }
         reconcile(with: feed)
     }
 
-    private func reconcile(with feed: SettlementFeed) {
+    /// Internal (not private) so tests can drive reconciliation with
+    /// constructed feeds instead of the network.
+    func reconcile(with feed: SettlementFeed) {
+        // Captured before the list updates so "new to this device" is
+        // computed against what the user could actually have seen.
+        let knownIDs = Set(settlements.map(\.id))
+
         for fresh in feed.settlements {
             guard tracked.contains(fresh.id) else { continue }
             let previous = trackedSnapshots[fresh.id]
@@ -176,6 +193,21 @@ final class AppModel {
         settlements = feed.settlements
         feedGeneratedAt = feed.generatedAt
         SpotlightIndexer.index(settlements)
+
+        // "We'll ping you the day a new settlement opens" — the Alerts
+        // tab already promises this, so it must be true. Local-only for
+        // now (fires when a refresh discovers the settlement); server
+        // push (PIPELINE.md §5) later makes it same-day regardless of
+        // app opens. Only for likely matches: a lifetime user's alert
+        // channel is high-trust, and blasting every settlement burns it.
+        if lifetime {
+            let newMatches = feed.settlements.filter {
+                !knownIDs.contains($0.id) && !$0.closed && isMatch($0)
+            }
+            Task {
+                for s in newMatches { await DeadlineAlerts.notifyNewSettlement(s) }
+            }
+        }
     }
 
     func dismissDeadlineNotice(_ notice: DeadlineNotice) {
@@ -322,5 +354,25 @@ enum DeadlineAlerts {
         UNUserNotificationCenter.current().removePendingNotificationRequests(
             withIdentifiers: [7, 1].map { "owed.deadline.\(settlementID).t\($0)" }
         )
+    }
+
+    /// A feed refresh discovered a settlement this user likely matches.
+    /// Once-per-settlement is guaranteed by the caller (newness is
+    /// computed against the persisted last-good feed); the stable
+    /// identifier additionally collapses any same-session repeats.
+    static func notifyNewSettlement(_ s: Settlement) async {
+        guard await ensureAuthorized() else { return }
+
+        let content = UNMutableNotificationContent()
+        content.title = "New settlement you may qualify for"
+        content.body = "\(s.name) — \(s.payoutRange) \(s.payoutTerms). "
+            + "Claims close in \(s.daysLeft) day\(s.daysLeft == 1 ? "" : "s")."
+        content.sound = .default
+
+        try? await UNUserNotificationCenter.current().add(UNNotificationRequest(
+            identifier: "owed.new.\(s.id)",
+            content: content,
+            trigger: nil
+        ))
     }
 }
