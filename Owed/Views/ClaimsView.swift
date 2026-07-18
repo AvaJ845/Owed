@@ -13,13 +13,22 @@ struct ClaimsView: View {
                     .padding(.leading, 4)
                     .padding(.bottom, 14)
 
+                if model.totalRecovered > 0 {
+                    recoveredCard
+                        .padding(.bottom, 14)
+                }
+
                 if model.trackedSettlements.isEmpty {
                     emptyState
                 } else {
                     LazyVStack(spacing: 12) {
                         ForEach(model.trackedSettlements) { s in
                             Button { selected = s } label: {
-                                DocketCard(settlement: s, isTracked: true)
+                                DocketCard(
+                                    settlement: s,
+                                    isTracked: true,
+                                    status: model.status(for: s)
+                                )
                             }
                             .buttonStyle(.plain)
                         }
@@ -33,6 +42,25 @@ struct ClaimsView: View {
             SettlementDetailView(settlement: s)
                 .presentationDragIndicator(.visible)
         }
+    }
+
+    /// Lifetime recovered total — the retention number and the screenshot
+    /// users share.
+    private var recoveredCard: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(model.totalRecovered.usd)
+                .font(OwedFont.displayBold(25))
+                .foregroundStyle(T.green)
+                .contentTransition(.numericText())
+            Text("RECOVERED WITH OWED")
+                .font(OwedFont.body(10, weight: .semibold))
+                .kerning(0.8)
+                .foregroundStyle(T.mut)
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .docketSurface(cornerRadius: 14)
     }
 
     private var emptyState: some View {

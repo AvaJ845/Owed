@@ -4,6 +4,8 @@ import SwiftUI
 struct DocketCard: View {
     let settlement: Settlement
     let isTracked: Bool
+    var isMatch: Bool = false
+    var status: AppModel.ClaimStatus? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -32,17 +34,19 @@ struct DocketCard: View {
                 }
             }
 
-            HStack {
-                Text(settlement.receiptRequired ? "DOCUMENTATION REQUIRED" : "NO RECEIPT NEEDED")
-                    .font(OwedFont.body(10, weight: .bold))
-                    .kerning(0.5)
-                    .foregroundStyle(settlement.receiptRequired ? T.tagProofFg : T.green)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
-                    .background(
-                        settlement.receiptRequired ? T.tagProofBg : T.greenSoft,
-                        in: RoundedRectangle(cornerRadius: 6, style: .continuous)
+            HStack(spacing: 6) {
+                if let status {
+                    Tag(text: statusText(status), fg: statusColors(status).fg, bg: statusColors(status).bg)
+                } else {
+                    if isMatch {
+                        Tag(text: "✦ LIKELY MATCH", fg: T.gold, bg: T.goldSoft)
+                    }
+                    Tag(
+                        text: settlement.receiptRequired ? "DOCUMENTATION REQUIRED" : "NO RECEIPT NEEDED",
+                        fg: settlement.receiptRequired ? T.tagProofFg : T.green,
+                        bg: settlement.receiptRequired ? T.tagProofBg : T.greenSoft
                     )
+                }
 
                 Spacer()
 
@@ -65,12 +69,50 @@ struct DocketCard: View {
         .accessibilityLabel(accessibilitySummary)
     }
 
+    private func statusText(_ s: AppModel.ClaimStatus) -> String {
+        switch s {
+        case .actionNeeded: "ACTION NEEDED"
+        case .pending: "FILED · PENDING"
+        case .awaitingPayout: "AWAITING PAYOUT"
+        case .paid(let amount): "PAID · \(amount.usd)"
+        }
+    }
+
+    private func statusColors(_ s: AppModel.ClaimStatus) -> (fg: Color, bg: Color) {
+        switch s {
+        case .actionNeeded: (T.stamp, T.stampSoft)
+        case .pending: (T.green, T.greenSoft)
+        case .awaitingPayout: (T.gold, T.goldSoft)
+        case .paid: (T.green, T.greenSoft)
+        }
+    }
+
     private var accessibilitySummary: String {
         var parts = [settlement.name, settlement.payoutRange, settlement.payoutTerms]
         parts.append(settlement.receiptRequired ? "documentation required" : "no receipt needed")
         parts.append("closes in \(settlement.daysLeft) days")
+        if isMatch { parts.append("likely match for you") }
+        if let status { parts.append(statusText(status).lowercased()) }
         if isTracked { parts.append("tracking") }
         return parts.joined(separator: ", ")
+    }
+}
+
+/// Small uppercase pill tag used in the card meta row.
+private struct Tag: View {
+    let text: String
+    let fg: Color
+    let bg: Color
+
+    var body: some View {
+        Text(text)
+            .font(OwedFont.body(10, weight: .bold))
+            .kerning(0.5)
+            .foregroundStyle(fg)
+            .lineLimit(1)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(bg, in: RoundedRectangle(cornerRadius: 6, style: .continuous))
     }
 }
 

@@ -14,6 +14,9 @@ struct OwedApp: App {
                 .onChange(of: store.owned, initial: true) { _, owned in
                     model.lifetime = owned
                 }
+                .task {
+                    SpotlightIndexer.index(model.settlements)
+                }
         }
     }
 }

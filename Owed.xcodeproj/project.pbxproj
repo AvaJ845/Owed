@@ -15,10 +15,6 @@
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		A100000000000000000000B1 /* Owed */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			explicitFileTypes = {
-			};
-			explicitFolders = (
-			);
 			path = Owed;
 			sourceTree = "<group>";
 		};
