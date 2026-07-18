@@ -140,9 +140,11 @@ struct DeadlineStamp: View {
 }
 
 #Preview {
+    let feed = SettlementFeed.bundled()?.settlements ?? []
     VStack {
-        DocketCard(settlement: .mockFeed[0], isTracked: true)
-        DocketCard(settlement: .mockFeed[2], isTracked: false)
+        ForEach(feed.prefix(2)) { s in
+            DocketCard(settlement: s, isTracked: s.id == feed.first?.id)
+        }
     }
     .padding()
     .background(T.paper)

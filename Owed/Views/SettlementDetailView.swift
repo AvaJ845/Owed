@@ -345,6 +345,8 @@ private struct CheckRow: View {
 }
 
 #Preview {
-    SettlementDetailView(settlement: .mockFeed[0])
-        .environment(AppModel())
+    if let first = SettlementFeed.bundled()?.settlements.first {
+        SettlementDetailView(settlement: first)
+            .environment(AppModel())
+    }
 }

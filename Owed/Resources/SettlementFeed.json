@@ -1,0 +1,96 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-18T00:00:00Z",
+  "settlements": [
+    {
+      "id": "s1",
+      "caseNo": "No. 3:24-cv-01881",
+      "name": "StreamBox Privacy Settlement",
+      "category": "Data privacy — viewing history shared with advertisers",
+      "payoutLo": 38,
+      "payoutHi": 120,
+      "payoutTerms": "per class member",
+      "deadline": "2026-07-29",
+      "receiptRequired": false,
+      "adminURL": "https://example-administrator.com/streambox",
+      "eligibility": [
+        "I had a StreamBox account between Jan 2019 and Mar 2024",
+        "I resided in the U.S. during that period"
+      ],
+      "matchKeys": ["streaming"],
+      "verifiedAt": "2026-07-16"
+    },
+    {
+      "id": "s2",
+      "caseNo": "No. 1:23-cv-04412",
+      "name": "MegaMart Overcharge Settlement",
+      "category": "False advertising — unit pricing on weighed goods",
+      "payoutLo": 25,
+      "payoutHi": 500,
+      "payoutTerms": "depends on purchase history",
+      "deadline": "2026-08-23",
+      "receiptRequired": false,
+      "adminURL": "https://example-administrator.com/megamart",
+      "eligibility": [
+        "I bought weighed grocery items at MegaMart 2020–2023",
+        "I don't have receipts but purchased at least once"
+      ],
+      "matchKeys": ["groceries"],
+      "verifiedAt": "2026-07-17"
+    },
+    {
+      "id": "s3",
+      "caseNo": "No. 5:22-cv-09174",
+      "name": "Handset Battery Throttling",
+      "category": "Consumer electronics — undisclosed performance limits",
+      "payoutLo": 65,
+      "payoutHi": 65,
+      "payoutTerms": "per eligible device",
+      "deadline": "2026-09-14",
+      "receiptRequired": true,
+      "adminURL": "https://example-administrator.com/handset",
+      "eligibility": [
+        "I owned an affected handset model (serial check at filing)",
+        "Device was purchased new, not refurbished"
+      ],
+      "matchKeys": ["smartphone"],
+      "verifiedAt": "2026-07-14"
+    },
+    {
+      "id": "s4",
+      "caseNo": "No. 2:24-cv-00317",
+      "name": "FastFashion Text Spam (TCPA)",
+      "category": "Telemarketing — texts after opt-out",
+      "payoutLo": 150,
+      "payoutHi": 900,
+      "payoutTerms": "per claimant",
+      "deadline": "2026-08-10",
+      "receiptRequired": false,
+      "adminURL": "https://example-administrator.com/fastfashion",
+      "eligibility": [
+        "I received marketing texts after replying STOP",
+        "My number can be matched in defendant's records"
+      ],
+      "matchKeys": ["spamTexts"],
+      "verifiedAt": "2026-07-16"
+    },
+    {
+      "id": "s5",
+      "caseNo": "No. 4:23-cv-06650",
+      "name": "CreditWatch Data Breach",
+      "category": "Data breach — SSNs and DOBs exposed",
+      "payoutLo": 50,
+      "payoutHi": 5000,
+      "payoutTerms": "up to, with documented losses",
+      "deadline": "2026-11-15",
+      "receiptRequired": true,
+      "adminURL": "https://example-administrator.com/creditwatch",
+      "eligibility": [
+        "I received a breach notice or can verify exposure",
+        "I can document time or out-of-pocket losses for higher tiers"
+      ],
+      "matchKeys": ["breachNotice"],
+      "verifiedAt": "2026-07-13"
+    }
+  ]
+}

@@ -56,9 +56,10 @@ final class AppModel {
         }
     }
 
-    /// The published feed. Mock today; production swaps this for the
-    /// Owed API response (same shape — see PIPELINE.md §3).
-    let settlements: [Settlement] = Settlement.mockFeed
+    /// The published feed: the reviewed snapshot bundled with this build.
+    /// Step 2 layers remote fetch + cache onto the same decode path
+    /// (PIPELINE.md §3), with this snapshot as the offline floor.
+    let settlements: [Settlement] = SettlementFeed.bundled()?.settlements ?? []
 
     init() {
         let defaults = UserDefaults.standard

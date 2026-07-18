@@ -1,10 +1,9 @@
 import Foundation
 
-/// One published, human-reviewed settlement.
-/// Field shape mirrors the production API contract in PIPELINE.md §3 —
-/// swapping the mock feed for `GET /v1/settlements?status=open` is a
-/// decoder change, not a model change.
-struct Settlement: Identifiable, Codable, Hashable {
+/// One published, human-reviewed settlement, decoded from the settlement
+/// feed (SettlementFeed). Field shape mirrors the production API contract
+/// in PIPELINE.md §3.
+struct Settlement: Identifiable, Decodable, Hashable {
     let id: String
     let caseNo: String
     let name: String
@@ -47,6 +46,72 @@ struct Settlement: Identifiable, Codable, Hashable {
     var closed: Bool { deadline < Calendar.current.startOfDay(for: .now) }
 }
 
+// MARK: - Feed decoding
+
+extension Settlement {
+    private enum CodingKeys: String, CodingKey {
+        case id, caseNo, name, category, payoutLo, payoutHi, payoutTerms
+        case deadline, receiptRequired, adminURL, eligibility
+        case matchKeys, verifiedAt
+    }
+
+    /// Strict about structure, tolerant about vocabulary: every field is
+    /// required and validated (a record we can't trust is dropped by the
+    /// envelope's lossy decode), but match keys this build doesn't know
+    /// are ignored so older apps survive newer feeds.
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+
+        id = try c.decode(String.self, forKey: .id)
+        guard !id.isEmpty else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .id, in: c, debugDescription: "Empty settlement id"
+            )
+        }
+
+        caseNo = try c.decode(String.self, forKey: .caseNo)
+        name = try c.decode(String.self, forKey: .name)
+        category = try c.decode(String.self, forKey: .category)
+
+        payoutLo = try c.decode(Int.self, forKey: .payoutLo)
+        payoutHi = try c.decode(Int.self, forKey: .payoutHi)
+        guard payoutLo >= 0, payoutLo <= payoutHi else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .payoutLo, in: c,
+                debugDescription: "Invalid payout range \(payoutLo)–\(payoutHi)"
+            )
+        }
+
+        payoutTerms = try c.decode(String.self, forKey: .payoutTerms)
+        deadline = try c.decodeFeedDay(forKey: .deadline)
+        receiptRequired = try c.decode(Bool.self, forKey: .receiptRequired)
+
+        // The app sends users to this URL to enter personal information;
+        // require https so a bad feed record can't downgrade that.
+        adminURL = try c.decode(URL.self, forKey: .adminURL)
+        guard adminURL.scheme?.lowercased() == "https" else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .adminURL, in: c,
+                debugDescription: "Administrator URL must be https"
+            )
+        }
+
+        eligibility = try c.decode([String].self, forKey: .eligibility)
+        guard !eligibility.isEmpty else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .eligibility, in: c,
+                debugDescription: "Settlement has no eligibility criteria"
+            )
+        }
+
+        matchKeys = try c.decode([String].self, forKey: .matchKeys)
+            .compactMap(MatchKey.init)
+        verifiedAt = try c.decodeFeedDay(forKey: .verifiedAt)
+    }
+}
+
+// MARK: - Formatting
+
 private let usdFormatter: NumberFormatter = {
     let f = NumberFormatter()
     f.numberStyle = .decimal
@@ -59,84 +124,4 @@ extension Int {
     var usd: String {
         "$" + (usdFormatter.string(from: NSNumber(value: self)) ?? String(self))
     }
-}
-
-// MARK: - Mock feed (production shape; see PIPELINE.md)
-
-extension Settlement {
-    /// Mock deadlines are relative to install day so the demo always shows
-    /// a live-looking feed; the production API sends absolute dates.
-    private static func inDays(_ n: Int) -> Date {
-        Calendar.current.date(byAdding: .day, value: n, to: Calendar.current.startOfDay(for: .now))!
-    }
-
-    private static func daysAgo(_ n: Int) -> Date { inDays(-n) }
-
-    static let mockFeed: [Settlement] = [
-        Settlement(
-            id: "s1", caseNo: "No. 3:24-cv-01881",
-            name: "StreamBox Privacy Settlement",
-            category: "Data privacy — viewing history shared with advertisers",
-            payoutLo: 38, payoutHi: 120, payoutTerms: "per class member",
-            deadline: inDays(11), receiptRequired: false,
-            adminURL: URL(string: "https://example-administrator.com/streambox")!,
-            eligibility: [
-                "I had a StreamBox account between Jan 2019 and Mar 2024",
-                "I resided in the U.S. during that period",
-            ],
-            matchKeys: [.streaming], verifiedAt: daysAgo(2)
-        ),
-        Settlement(
-            id: "s2", caseNo: "No. 1:23-cv-04412",
-            name: "MegaMart Overcharge Settlement",
-            category: "False advertising — unit pricing on weighed goods",
-            payoutLo: 25, payoutHi: 500, payoutTerms: "depends on purchase history",
-            deadline: inDays(36), receiptRequired: false,
-            adminURL: URL(string: "https://example-administrator.com/megamart")!,
-            eligibility: [
-                "I bought weighed grocery items at MegaMart 2020–2023",
-                "I don't have receipts but purchased at least once",
-            ],
-            matchKeys: [.groceries], verifiedAt: daysAgo(1)
-        ),
-        Settlement(
-            id: "s3", caseNo: "No. 5:22-cv-09174",
-            name: "Handset Battery Throttling",
-            category: "Consumer electronics — undisclosed performance limits",
-            payoutLo: 65, payoutHi: 65, payoutTerms: "per eligible device",
-            deadline: inDays(58), receiptRequired: true,
-            adminURL: URL(string: "https://example-administrator.com/handset")!,
-            eligibility: [
-                "I owned an affected handset model (serial check at filing)",
-                "Device was purchased new, not refurbished",
-            ],
-            matchKeys: [.smartphone], verifiedAt: daysAgo(4)
-        ),
-        Settlement(
-            id: "s4", caseNo: "No. 2:24-cv-00317",
-            name: "FastFashion Text Spam (TCPA)",
-            category: "Telemarketing — texts after opt-out",
-            payoutLo: 150, payoutHi: 900, payoutTerms: "per claimant",
-            deadline: inDays(23), receiptRequired: false,
-            adminURL: URL(string: "https://example-administrator.com/fastfashion")!,
-            eligibility: [
-                "I received marketing texts after replying STOP",
-                "My number can be matched in defendant's records",
-            ],
-            matchKeys: [.spamTexts], verifiedAt: daysAgo(2)
-        ),
-        Settlement(
-            id: "s5", caseNo: "No. 4:23-cv-06650",
-            name: "CreditWatch Data Breach",
-            category: "Data breach — SSNs and DOBs exposed",
-            payoutLo: 50, payoutHi: 5000, payoutTerms: "up to, with documented losses",
-            deadline: inDays(120), receiptRequired: true,
-            adminURL: URL(string: "https://example-administrator.com/creditwatch")!,
-            eligibility: [
-                "I received a breach notice or can verify exposure",
-                "I can document time or out-of-pocket losses for higher tiers",
-            ],
-            matchKeys: [.breachNotice], verifiedAt: daysAgo(5)
-        ),
-    ]
 }
