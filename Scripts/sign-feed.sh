@@ -2,6 +2,10 @@
 # Sign Owed/Resources/SettlementFeed.json with the Ed25519 private key.
 # Creates Scripts/keys/ on first run if missing.
 set -euo pipefail
+# Private key material: create it unreadable by group/other from the
+# start (umask) and belt-and-suspenders chmod below. A world-readable
+# signing key on a shared machine is a feed-forgery risk.
+umask 077
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 KEYS="$ROOT/Scripts/keys"
 PRIV="$KEYS/feed_ed25519_private.b64"
@@ -10,6 +14,7 @@ FEED="$ROOT/Owed/Resources/SettlementFeed.json"
 SIG="$ROOT/Owed/Resources/SettlementFeed.json.sig"
 
 mkdir -p "$KEYS"
+chmod 700 "$KEYS"
 
 xcrun swift -e "
 import CryptoKit
@@ -43,3 +48,6 @@ print(\"Signed \(feedPath)\")
 print(\"Public key → \(pubPath)\")
 print(\"Signature  → \(sigPath)\")
 "
+
+# Belt-and-suspenders: enforce 0600 even if the key predates the umask line.
+[ -f "$PRIV" ] && chmod 600 "$PRIV"
