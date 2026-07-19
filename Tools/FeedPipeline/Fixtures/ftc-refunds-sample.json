@@ -1,0 +1,60 @@
+{
+  "_note": "Representative FTC redress shape for pipeline testing. Fields mirror what ftc.gov/exploredata exposes per case. Finalize the live export URL + selector against the real dashboard before enabling live discover.",
+  "cases": [
+    {
+      "slug": "ftc-vonage-refunds",
+      "name": "FTC v. Vonage — Junk-Fee Refunds",
+      "matterNumber": "1923172",
+      "docketNumber": "3:22-cv-06435",
+      "court": "D.N.J.",
+      "category": "Junk fees — hard-to-cancel service",
+      "refundLow": 12,
+      "refundHigh": 100,
+      "payoutTerms": "FTC redress; amount depends on fees paid",
+      "claimDeadline": "2026-10-15",
+      "claimURL": "https://www.ftc.gov/vonage-refunds",
+      "detailURL": "https://www.ftc.gov/enforcement/refunds/vonage-refunds",
+      "requiresProof": false,
+      "eligibility": [
+        "I was charged by Vonage for a service I tried to cancel",
+        "I have not already received a refund for these charges"
+      ],
+      "matchKeys": ["spamTexts"]
+    },
+    {
+      "slug": "ftc-benefytt-refunds",
+      "name": "FTC v. Benefytt — Deceptive Health Plan Refunds",
+      "matterNumber": "1723066",
+      "docketNumber": "8:22-cv-01794",
+      "court": "M.D. Fla.",
+      "category": "Deceptive marketing — health plans",
+      "refundLow": 25,
+      "refundHigh": 900,
+      "payoutTerms": "pro rata by amount paid; not a fixed check",
+      "claimDeadline": "2026-09-30",
+      "claimURL": "https://www.ftc.gov/benefytt-refunds",
+      "detailURL": "https://www.ftc.gov/enforcement/refunds/benefytt-refunds",
+      "requiresProof": false,
+      "eligibility": [
+        "I bought a Benefytt health plan or add-on product between 2017 and 2022"
+      ],
+      "matchKeys": []
+    },
+    {
+      "slug": "ftc-credit-karma-automatic",
+      "name": "FTC v. Credit Karma — Automatic Payments",
+      "matterNumber": "1923172",
+      "docketNumber": "3:22-cv-09999",
+      "court": "N.D. Cal.",
+      "category": "Deceptive 'pre-approved' offers",
+      "refundLow": 8,
+      "refundHigh": 8,
+      "payoutTerms": "checks mailed automatically",
+      "claimURL": null,
+      "detailURL": "https://www.ftc.gov/enforcement/refunds/credit-karma-refunds",
+      "requiresProof": false,
+      "eligibility": [],
+      "matchKeys": []
+    }
+  ]
+}
