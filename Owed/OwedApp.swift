@@ -44,6 +44,9 @@ struct OwedApp: App {
                 }
                 .task {
                     AppRuntime.wireIntentBridge()
+                    // Adopt the last-good disk cache off the main thread
+                    // before indexing, so a large cache doesn't stall launch.
+                    await model.loadCachedFeed()
                     SpotlightIndexer.index(model.settlements)
                     FeedRefreshBridge.refresh = {
                         await AppRuntime.model.refreshFeed()

@@ -31,6 +31,16 @@ enum FeedStore {
         subsystem: Bundle.main.bundleIdentifier ?? "Owed", category: "feedstore"
     )
 
+    /// Hard cap on downloaded bytes. A signed feed of hundreds of
+    /// settlements is tens of KB; the cap exists because signature
+    /// verification happens *after* download, so without it a network
+    /// attacker or broken CDN could stream an unbounded body into memory
+    /// before we ever reject it. The signature is ~88 bytes.
+    private static let maxFeedBytes = 5 * 1024 * 1024   // 5 MB
+    private static let maxSignatureBytes = 8 * 1024      // 8 KB
+
+    private enum FeedError: Error { case tooLarge }
+
     /// Ephemeral on purpose: no cookie store, no credential cache, no
     /// persistent URL cache — the shared session would quietly accumulate
     /// state around a request whose whole point is carrying none. Tight
@@ -45,35 +55,47 @@ enum FeedStore {
         return URLSession(configuration: config)
     }()
 
-    /// Best locally available feed, newest first. Synchronous and cheap —
-    /// safe to call during app init.
-    static func bestAvailable() -> SettlementFeed? {
-        if let cached = cachedFeed() { return cached }
-        return SettlementFeed.bundled()
+    /// Raw bytes of the last-good downloaded feed on disk (nil if none).
+    /// Just I/O — decode on the caller's side so the disk read can run
+    /// off the main actor without moving a non-Sendable feed across it.
+    static func cachedData() -> Data? {
+        guard let url = cacheURL else { return nil }
+        return try? Data(contentsOf: url)
+    }
+
+    /// Drop an unreadable cache (and its ETag) so the next launch falls
+    /// back to the bundled snapshot instead of retrying dead bytes.
+    static func discardCache() {
+        if let url = cacheURL { try? FileManager.default.removeItem(at: url) }
+        UserDefaults.standard.removeObject(forKey: etagKey)
     }
 
     /// Fetches the remote feed if it changed (ETag-validated). Returns
     /// the new feed, or nil when unchanged or unavailable — callers keep
-    /// whatever they're showing in either case.
-    static func refresh() async -> SettlementFeed? {
+    /// whatever they're showing in either case. `floor` is the
+    /// generatedAt already on screen; a feed older than it is rejected
+    /// (publish-rewind guard) without re-reading the disk cache.
+    static func refresh(notOlderThan floor: Date?) async -> SettlementFeed? {
         var request = URLRequest(url: remoteURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         if let etag = UserDefaults.standard.string(forKey: etagKey) {
             request.setValue(etag, forHTTPHeaderField: "If-None-Match")
         }
 
-        let data: Data
-        let response: URLResponse
+        let http: HTTPURLResponse
+        let body: Data?
         do {
-            (data, response) = try await session.data(for: request)
+            (http, body) = try await fetchCapped(request, maxBytes: maxFeedBytes)
+        } catch FeedError.tooLarge {
+            log.error("Remote feed exceeded \(maxFeedBytes) bytes; refusing")
+            return nil
         } catch {
             log.info("Feed refresh skipped (offline or unreachable): \(String(describing: error))")
             return nil
         }
 
-        guard let http = response as? HTTPURLResponse else { return nil }
         if http.statusCode == 304 { return nil }
-        guard http.statusCode == 200 else {
+        guard http.statusCode == 200, let data = body else {
             log.error("Feed refresh got HTTP \(http.statusCode)")
             return nil
         }
@@ -106,16 +128,42 @@ enum FeedStore {
             return nil
         }
 
-        // A publish rewind (older generatedAt than what we have) is
-        // suspicious — keep the newer local copy.
-        if let current = bestAvailable(), feed.generatedAt < current.generatedAt {
-            log.error("Remote feed older than local (\(feed.generatedAt) < \(current.generatedAt)); ignoring")
+        // A publish rewind (older than what's on screen) is suspicious —
+        // keep the newer copy. Compared against the in-memory floor, so
+        // no redundant disk read/decode.
+        if let floor, feed.generatedAt < floor {
+            log.error("Remote feed older than current (\(feed.generatedAt) < \(floor)); ignoring")
             return nil
         }
 
         persist(data: data, etag: http.value(forHTTPHeaderField: "ETag"))
         logMinAppVersionIfBehind(feed)
         return feed
+    }
+
+    /// Streams a response body, aborting the moment it exceeds `maxBytes`,
+    /// so an oversized (or Content-Length-lying) response can't exhaust
+    /// memory before verification. Body is nil for a 304.
+    private static func fetchCapped(
+        _ request: URLRequest, maxBytes: Int
+    ) async throws -> (http: HTTPURLResponse, body: Data?) {
+        let (bytes, response) = try await session.bytes(for: request)
+        guard let http = response as? HTTPURLResponse else {
+            throw URLError(.badServerResponse)
+        }
+        if http.statusCode == 304 { return (http, nil) }
+        // Reject early when the server honestly declares an oversized body.
+        if http.expectedContentLength > Int64(maxBytes) { throw FeedError.tooLarge }
+
+        var data = Data()
+        if http.expectedContentLength > 0 {
+            data.reserveCapacity(min(maxBytes, Int(http.expectedContentLength)))
+        }
+        for try await byte in bytes {
+            data.append(byte)
+            if data.count > maxBytes { throw FeedError.tooLarge }
+        }
+        return (http, data)
     }
 
     // MARK: - Signature
@@ -130,11 +178,9 @@ enum FeedStore {
         var request = URLRequest(url: signatureURL)
         request.cachePolicy = .reloadIgnoringLocalCacheData
         do {
-            let (data, response) = try await session.data(for: request)
-            guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
-                return nil
-            }
-            return data
+            let (http, body) = try await fetchCapped(request, maxBytes: maxSignatureBytes)
+            guard http.statusCode == 200 else { return nil }
+            return body
         } catch {
             return nil
         }
@@ -150,20 +196,6 @@ enum FeedStore {
         return dir.appendingPathComponent("SettlementFeed.json")
     }
 
-    private static func cachedFeed() -> SettlementFeed? {
-        guard let url = cacheURL, let data = try? Data(contentsOf: url) else { return nil }
-        do {
-            return try SettlementFeed.decode(data)
-        } catch {
-            // A cache this build can't read (e.g. schema bumped by a
-            // newer publish) is dead weight — drop it and fall back to
-            // the bundled snapshot.
-            log.error("Cached feed failed to decode; discarding: \(String(describing: error))")
-            try? FileManager.default.removeItem(at: url)
-            UserDefaults.standard.removeObject(forKey: etagKey)
-            return nil
-        }
-    }
 
     private static func persist(data: Data, etag: String?) {
         guard let url = cacheURL else { return }

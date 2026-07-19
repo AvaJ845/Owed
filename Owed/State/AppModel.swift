@@ -138,16 +138,40 @@ final class AppModel {
             deadlineNotices = []
         }
 
-        let feed = FeedStore.bestAvailable()
-        settlements = feed?.settlements ?? []
-        feedGeneratedAt = feed?.generatedAt
+        // Fast launch path: seed from the bundled snapshot only. It's
+        // small and fixed-size, so it never blocks first frame; the
+        // larger last-good disk cache is adopted asynchronously in
+        // loadCachedFeed().
+        let bundled = SettlementFeed.bundled()
+        settlements = bundled?.settlements ?? []
+        feedGeneratedAt = bundled?.generatedAt
+        backfillTrackedSnapshots()
+    }
 
-        // Users who tracked claims before snapshots existed: backfill
-        // from the current feed so their claims are protected from the
-        // first refresh onward.
+    /// Users who tracked claims before snapshots existed: backfill from
+    /// the current feed so their claims are protected from the first
+    /// refresh onward.
+    private func backfillTrackedSnapshots() {
         for s in settlements where tracked.contains(s.id) && trackedSnapshots[s.id] == nil {
             trackedSnapshots[s.id] = s
         }
+    }
+
+    /// Adopt the last-good disk cache if it's present and not older than
+    /// what's shown. The disk read runs off the main actor so a large
+    /// cached feed can't stall launch; the small decode lands back here.
+    /// Call once at launch, before `refreshFeed()`.
+    func loadCachedFeed() async {
+        let data = await Task.detached(priority: .utility) { FeedStore.cachedData() }.value
+        guard let data else { return }
+        guard let cached = try? SettlementFeed.decode(data) else {
+            FeedStore.discardCache()   // unreadable (e.g. schema bump) — drop it
+            return
+        }
+        if let floor = feedGeneratedAt, cached.generatedAt < floor { return }
+        settlements = cached.settlements
+        feedGeneratedAt = cached.generatedAt
+        backfillTrackedSnapshots()
     }
 
     // MARK: Feed refresh + reconciliation (Step 3)
@@ -164,7 +188,7 @@ final class AppModel {
         guard !refreshing else { return }
         refreshing = true
         defer { refreshing = false }
-        guard let feed = await FeedStore.refresh() else { return }
+        guard let feed = await FeedStore.refresh(notOlderThan: feedGeneratedAt) else { return }
         reconcile(with: feed)
     }
 
