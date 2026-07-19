@@ -80,6 +80,15 @@ enum FeedStore {
 
         // Signature before decode: a CDN that serves a well-formed but
         // malicious feed must not enter the decode path at all.
+        //
+        // The feed and its detached signature are two GETs, so a publish
+        // that lands between them can pair new bytes with the old
+        // signature (or vice versa) and fail verification. That is by
+        // design: verification fails closed — we keep last-good and never
+        // persist the mismatched bytes or their ETag — and the next
+        // refresh re-fetches a now-consistent pair, so the state
+        // self-heals. Fetching the signature only after a 200 (not on the
+        // common 304) keeps the unchanged-feed poll a single request.
         guard let signature = await fetchSignature() else {
             log.error("Remote feed signature missing; keeping last-good")
             return nil

@@ -143,16 +143,22 @@ enum FeedDay {
     static func string(from date: Date) -> String {
         formatter.string(from: date)
     }
-}
 
-extension KeyedDecodingContainer {
     /// Decodes a "yyyy-MM-dd" feed day, throwing a descriptive error on
     /// any other format so the bad record is dropped and logged upstream.
-    func decodeFeedDay(forKey key: Key) throws -> Date {
-        let raw = try decode(String.self, forKey: key)
-        guard let date = FeedDay.date(from: raw) else {
+    ///
+    /// Namespaced on `FeedDay` rather than added to `KeyedDecodingContainer`
+    /// on purpose: the local-midnight day contract is feed-specific, and a
+    /// container extension would offer it in autocomplete to every decoder
+    /// in the app, inviting an instant field to silently pick up day
+    /// semantics.
+    static func decode<K>(
+        from container: KeyedDecodingContainer<K>, forKey key: K
+    ) throws -> Date {
+        let raw = try container.decode(String.self, forKey: key)
+        guard let date = date(from: raw) else {
             throw DecodingError.dataCorruptedError(
-                forKey: key, in: self,
+                forKey: key, in: container,
                 debugDescription: "Expected yyyy-MM-dd, got \"\(raw)\""
             )
         }
