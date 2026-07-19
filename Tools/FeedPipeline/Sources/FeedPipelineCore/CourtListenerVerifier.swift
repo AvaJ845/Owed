@@ -19,13 +19,13 @@ public struct CourtListenerVerifier: Sendable {
     }
 
     private let token: String?
-    private let fetch: Fetcher
+    private let fetch: RequestFetcher
     private let base = URL(string: "https://www.courtlistener.com/api/rest/v4/dockets/")!
 
     /// `token` is the CourtListener membership API token (full API access
     /// now requires membership). When nil, verification is skipped with a
     /// note rather than failing — enrichment is best-effort by design.
-    public init(token: String?, fetcher: @escaping Fetcher) {
+    public init(token: String?, fetcher: @escaping RequestFetcher) {
         self.token = token
         self.fetch = fetcher
     }
@@ -34,12 +34,17 @@ public struct CourtListenerVerifier: Sendable {
     /// only genuine transport errors propagate, and callers treat those
     /// as "unverified", not "invalid".
     public func verify(_ lead: Lead) async -> Result {
-        guard token != nil else { return .notFound }
+        guard let token else { return .notFound }
         guard let docket = lead.court.flatMap({ _ in lead.caseNo }),
               let url = queryURL(docketNumber: docket)
         else { return .notFound }
 
-        guard let data = try? await fetch(url),
+        // CourtListener requires the token in the Authorization header —
+        // a bare GET is unauthenticated and would 401.
+        var request = URLRequest(url: url)
+        request.setValue("Token \(token)", forHTTPHeaderField: "Authorization")
+
+        guard let data = try? await fetch(request),
               let response = try? JSONDecoder().decode(DocketQueryResponse.self, from: data),
               let hit = response.results.first
         else { return .notFound }

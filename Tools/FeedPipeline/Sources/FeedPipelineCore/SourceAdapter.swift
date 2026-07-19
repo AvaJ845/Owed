@@ -6,6 +6,27 @@ import Foundation
 /// over fixture bytes.
 public typealias Fetcher = @Sendable (URL) async throws -> Data
 
+/// Request-based variant, for callers that must set headers (e.g. an
+/// Authorization token) — a bare URL can't carry auth.
+public typealias RequestFetcher = @Sendable (URLRequest) async throws -> Data
+
+/// Live request fetcher: same cookieless posture as `liveFetcher`, but
+/// sends the caller's fully-formed `URLRequest` (headers included).
+public func liveRequestFetcher(timeout: TimeInterval = 30) -> RequestFetcher {
+    let config = URLSessionConfiguration.ephemeral
+    config.httpShouldSetCookies = false
+    config.timeoutIntervalForRequest = timeout
+    let session = URLSession(configuration: config)
+    return { request in
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse, http.statusCode == 200 else {
+            throw PipelineError.badResponse(url: request.url ?? URL(string: "about:blank")!,
+                status: (response as? HTTPURLResponse)?.statusCode ?? -1)
+        }
+        return data
+    }
+}
+
 /// Default live fetcher: a plain GET, no cookies, no credentials — the
 /// pipeline reads public data only (PIPELINE.md privacy posture).
 public func liveFetcher(timeout: TimeInterval = 30) -> Fetcher {

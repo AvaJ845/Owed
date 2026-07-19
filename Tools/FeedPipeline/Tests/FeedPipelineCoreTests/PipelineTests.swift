@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 import Testing
 @testable import FeedPipelineCore
@@ -111,6 +112,24 @@ struct PipelineTests {
     }
 
     // MARK: Review queue
+
+    // MARK: Base-feed signature gate (S3)
+
+    @Test func feedIntegrityVerifiesGenuineSignatureAndRejectsTamper() {
+        let key = Curve25519.Signing.PrivateKey()
+        let pub = key.publicKey.rawRepresentation.base64EncodedString()
+        let feed = Data(#"{"schemaVersion":1,"generatedAt":"2026-07-18T00:00:00Z","settlements":[]}"#.utf8)
+        let sig = try! key.signature(for: feed).base64EncodedString()
+
+        #expect(FeedIntegrity.verify(feed: feed, signatureB64: sig, publicKeyB64: pub) == .verified)
+
+        var tampered = feed
+        tampered.append(contentsOf: [0x20])   // one extra byte
+        #expect(FeedIntegrity.verify(feed: tampered, signatureB64: sig, publicKeyB64: pub) == .invalid)
+
+        let otherKeySig = try! Curve25519.Signing.PrivateKey().signature(for: feed).base64EncodedString()
+        #expect(FeedIntegrity.verify(feed: feed, signatureB64: otherKeySig, publicKeyB64: pub) == .invalid)
+    }
 
     @Test func approveRefusesIncompleteLead() throws {
         let tmp = URL(fileURLWithPath: NSTemporaryDirectory())

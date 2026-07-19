@@ -84,6 +84,23 @@ do {
         let queue = try ReviewQueue(url: queueURL)
         guard !queue.approved.isEmpty else { print("No approved leads to publish."); break }
         let current = try? Data(contentsOf: feedURL)
+
+        // S3 gate: the base feed we carry forward must be the genuine
+        // signed artifact. A tampered-but-well-formed adminURL would pass
+        // structural validation, so verify intent via the signature
+        // before trusting those records. Re-publishing before re-signing
+        // is a legitimate exception — allow it explicitly.
+        if current != nil, !args.contains("--allow-unverified-base") {
+            let sigURL = URL(fileURLWithPath: feedURL.path + ".sig")
+            let pubURL = feedURL.deletingLastPathComponent().appendingPathComponent("FeedPublicKey.b64")
+            let check = FeedIntegrity.verifyFiles(feedURL: feedURL, signatureURL: sigURL, publicKeyURL: pubURL)
+            if check != .verified {
+                print("Refusing to carry forward an unverified base feed: \(check).")
+                print("Re-sign the current feed (./Scripts/sign-feed.sh), or pass "
+                    + "--allow-unverified-base to proceed knowingly.")
+                exit(1)
+            }
+        }
         let out = try Publisher.build(
             currentFeedJSON: current,
             approved: queue.approved,
