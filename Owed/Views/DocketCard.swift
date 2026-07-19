@@ -50,7 +50,7 @@ struct DocketCard: View {
 
                 Spacer()
 
-                DeadlineStamp(daysLeft: settlement.daysLeft, soon: settlement.closingSoon)
+                DeadlineStamp(daysLeft: settlement.daysLeft, soon: settlement.closingSoon, closed: settlement.closed)
             }
         }
         .padding(14)
@@ -90,7 +90,7 @@ struct DocketCard: View {
     private var accessibilitySummary: String {
         var parts = [settlement.name, settlement.payoutRange, settlement.payoutTerms]
         parts.append(settlement.receiptRequired ? "documentation required" : "no receipt needed")
-        parts.append("closes in \(settlement.daysLeft) days")
+        parts.append(settlement.closed ? "filing window closed" : "closes in \(settlement.daysLeft) days")
         if isMatch { parts.append("likely match for you") }
         if let status { parts.append(statusText(status).lowercased()) }
         if isTracked { parts.append("tracking") }
@@ -116,24 +116,30 @@ private struct Tag: View {
     }
 }
 
-/// The rotated docket stamp — red once a deadline is inside 21 days.
+/// The rotated docket stamp — red once a deadline is inside 21 days,
+/// and a neutral terminal "CLOSED" once the filing window has passed
+/// (daysLeft floors at 0, so without this a closed claim reads "DUE 0d",
+/// i.e. maximally urgent — exactly backwards).
 struct DeadlineStamp: View {
     let daysLeft: Int
     let soon: Bool
+    var closed: Bool = false
+
+    private var urgent: Bool { soon && !closed }
 
     var body: some View {
-        Text("DUE \(daysLeft)d")
+        Text(closed ? "CLOSED" : "DUE \(daysLeft)d")
             .font(OwedFont.mono(11))
-            .foregroundStyle(soon ? T.stamp : T.mut)
+            .foregroundStyle(urgent ? T.stamp : T.mut)
             .padding(.horizontal, 8)
             .padding(.vertical, 4)
             .background(
-                soon ? T.stampSoft : .clear,
+                urgent ? T.stampSoft : .clear,
                 in: RoundedRectangle(cornerRadius: 6, style: .continuous)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .strokeBorder(soon ? T.stamp : T.line, lineWidth: 1.5)
+                    .strokeBorder(urgent ? T.stamp : T.line, lineWidth: 1.5)
             )
             .rotationEffect(.degrees(-1.2))
     }
