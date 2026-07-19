@@ -1,0 +1,52 @@
+name: CI
+
+# Gate every PR into main on both test suites. The app deploys to iOS
+# 17+, so any recent simulator works; the workflow selects Xcode and the
+# simulator dynamically rather than pinning a device that may not exist
+# on the runner.
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  pipeline-tests:
+    name: Pipeline · swift test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: swift test
+        working-directory: Tools/FeedPipeline
+        run: swift test
+
+  app-tests:
+    name: App · xcodebuild test
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Select an available iOS simulator
+        id: sim
+        run: |
+          DEVICE=$(xcrun simctl list devices available \
+            | grep -oE 'iPhone [0-9][^(]*' | head -1 | xargs)
+          if [ -z "$DEVICE" ]; then echo "No iPhone simulator available"; exit 1; fi
+          echo "device=$DEVICE" >> "$GITHUB_OUTPUT"
+          echo "Using simulator: $DEVICE"
+      - name: xcodebuild test
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Owed.xcodeproj \
+            -scheme Owed \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.device }}" \
+            CODE_SIGNING_ALLOWED=NO
