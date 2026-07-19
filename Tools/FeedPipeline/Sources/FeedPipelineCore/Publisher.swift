@@ -58,9 +58,9 @@ public enum Publisher {
                 throw PipelineError.validation("approved lead \(lead.id) has no verifiedAt")
             }
             let obj = try feedObject(from: lead)
-            if byID[obj["id"] as! String] == nil { order.append(obj["id"] as! String) }
+            if byID[lead.id] == nil { order.append(lead.id) }
             else { carried -= 1 }        // replacing a carried record
-            byID[obj["id"] as! String] = obj
+            byID[lead.id] = obj
             added += 1
         }
 
