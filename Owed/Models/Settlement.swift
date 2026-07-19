@@ -88,7 +88,7 @@ extension Settlement {
         }
 
         payoutTerms = try c.decode(String.self, forKey: .payoutTerms)
-        deadline = try c.decodeFeedDay(forKey: .deadline)
+        deadline = try FeedDay.decode(from: c, forKey: .deadline)
         receiptRequired = try c.decode(Bool.self, forKey: .receiptRequired)
 
         // The app sends users to this URL to enter personal information;
@@ -111,7 +111,7 @@ extension Settlement {
 
         matchKeys = try c.decode([String].self, forKey: .matchKeys)
             .compactMap(MatchKey.init)
-        verifiedAt = try c.decodeFeedDay(forKey: .verifiedAt)
+        verifiedAt = try FeedDay.decode(from: c, forKey: .verifiedAt)
     }
 
     /// Mirrors the feed contract exactly (day-precision date strings,
