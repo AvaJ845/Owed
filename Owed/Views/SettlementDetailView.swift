@@ -24,7 +24,7 @@ struct SettlementDetailView: View {
         _checks = State(initialValue: Array(repeating: false, count: settlement.eligibility.count))
     }
 
-    private var ready: Bool { checks.allSatisfy(\.self) && attested }
+    private var ready: Bool { checks.allSatisfy(\.self) && attested && !settlement.closed }
     private var isTracked: Bool { model.isTracked(settlement) }
 
     var body: some View {
@@ -87,8 +87,15 @@ struct SettlementDetailView: View {
     }
 
     /// The pre-track flow: eligibility + perjury attestation, then file.
+    /// A closed settlement shouldn't reach here (Find and Spotlight both
+    /// exclude closed), but guard it anyway — the filing window passing
+    /// while a detail sheet is open must not leave a fileable form.
     @ViewBuilder
     private var eligibilityGate: some View {
+        if settlement.closed {
+            closedNotice
+        }
+
         Text("CONFIRM YOUR ELIGIBILITY")
             .font(OwedFont.body(11, weight: .semibold))
             .kerning(0.9)
@@ -109,7 +116,7 @@ struct SettlementDetailView: View {
         disclosure
 
         Button(action: startClaim) {
-            Text("Start claim & track it")
+            Text(settlement.closed ? "Filing window closed" : "Start claim & track it")
                 .font(OwedFont.body(15, weight: .bold))
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
@@ -120,8 +127,8 @@ struct SettlementDetailView: View {
         .disabled(!ready)
         .animation(OwedMotion.statusChange(reduceMotion: reduceMotion), value: ready)
         .sensoryFeedback(.success, trigger: ready) { $0 == false && $1 == true }
-        .accessibilityLabel("Start claim and track it")
-        .accessibilityHint(ready ? "Opens the official claim form and tracks this settlement" : "Check every eligibility box and the attestation to enable")
+        .accessibilityLabel(settlement.closed ? "Filing window closed" : "Start claim and track it")
+        .accessibilityHint(settlement.closed ? "This settlement's filing deadline has passed" : (ready ? "Opens the official claim form and tracks this settlement" : "Check every eligibility box and the attestation to enable"))
 
         Button("Not for me") { dismiss() }
             .font(OwedFont.body(13.5, weight: .semibold))
@@ -275,6 +282,32 @@ struct SettlementDetailView: View {
 
     /// Provenance made visible — competitors can't show this because
     /// they don't have it (PIPELINE.md §4).
+    /// Shown in the eligibility gate when the filing window has already
+    /// passed — pairs with the disabled CTA so the state is explained,
+    /// not just greyed out.
+    private var closedNotice: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "clock.badge.xmark")
+                .font(OwedFont.icon(16))
+                .foregroundStyle(T.stamp)
+                .padding(.top, 1)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text("FILING WINDOW CLOSED")
+                    .font(OwedFont.mono(11))
+                    .foregroundStyle(T.stamp)
+                Text("This settlement's claim deadline has passed, so it can no longer be filed through the administrator.")
+                    .font(OwedFont.body(11.5))
+                    .foregroundStyle(T.mut)
+                    .lineSpacing(3)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(T.stampSoft, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.bottom, 14)
+    }
+
     private var verifiedRow: some View {
         HStack(alignment: .top, spacing: 10) {
             Image(systemName: "checkmark.seal.fill")

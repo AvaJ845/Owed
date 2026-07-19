@@ -144,6 +144,29 @@ struct ReconciliationTests {
         #expect(model.deadlineNotices.isEmpty)
     }
 
+    @Test func closedSettlementLeavesBrowseButStaysTrackedAsAwaitingPayout() throws {
+        let model = makeModel()
+        model.profile = [.streaming]
+        let feed = try makeFeed([
+            (id: "open", deadline: "2027-03-01"),
+            (id: "past", deadline: "2020-01-01"),
+        ])
+        model.reconcile(with: feed)
+
+        let past = model.settlements.first { $0.id == "past" }!
+        #expect(past.closed)
+
+        // Browse surfaces and the match aggregate exclude the closed one,
+        // even though its match keys match the profile.
+        #expect(model.browsableSettlements.map(\.id) == ["open"])
+        #expect(model.matchedSettlements.map(\.id) == ["open"])
+
+        // But once tracked it stays in My Claims, reading as awaiting payout.
+        model.track(past)
+        #expect(model.trackedSettlements.map(\.id).contains("past"))
+        #expect(model.status(for: past) == .awaitingPayout)
+    }
+
     @Test func trackedStatePersistsAcrossModelRelaunch() throws {
         let suiteName = "owed.tests.\(UUID().uuidString)"
         let suite = UserDefaults(suiteName: suiteName)!

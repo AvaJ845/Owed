@@ -251,8 +251,19 @@ final class AppModel {
         s.matchKeys.contains { profile.contains($0) }
     }
 
+    /// Settlements still open to file. The browse surfaces (Find feed,
+    /// filters) and the match aggregate show only these — a closed
+    /// settlement is not something the user can act on, so it never
+    /// appears as browsable inventory or counts toward "likely matches."
+    /// Closed settlements the user already tracks stay visible in My
+    /// Claims via `trackedSettlements`, where they read as AWAITING
+    /// PAYOUT; that path is intentionally separate.
+    var browsableSettlements: [Settlement] {
+        settlements.filter { !$0.closed }
+    }
+
     var matchedSettlements: [Settlement] {
-        settlements.filter(isMatch).sorted { $0.deadline < $1.deadline }
+        browsableSettlements.filter(isMatch).sorted { $0.deadline < $1.deadline }
     }
 
     /// "You likely qualify for N settlements worth $lo–$hi."

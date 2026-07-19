@@ -55,7 +55,9 @@ struct FindView: View {
     }
 
     private var feed: [Settlement] {
-        filter.apply(model.settlements, isMatch: model.isMatch)
+        // Browse only open settlements — closed ones aren't actionable
+        // here and live on in My Claims if tracked (AppModel).
+        filter.apply(model.browsableSettlements, isMatch: model.isMatch)
     }
 
     var body: some View {
